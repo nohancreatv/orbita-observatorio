@@ -1,0 +1,8 @@
+{
+  "name": "Órbita — observatório de satélites",
+  "short_name": "Órbita",
+  "description": "Acompanhe satélites e encontre o ponto terrestre sob suas órbitas.",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f"
+}

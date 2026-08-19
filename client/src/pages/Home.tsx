@@ -143,6 +143,7 @@ export default function Home() {
   const centerLongitude = snapshot?.longitude || 0;
   const centerLatitude = snapshot?.latitude || 0;
   const selectedImage = OBJECT_IMAGES[selectedSatellite];
+  const groundPortraitUrl = snapshot ? `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude}`)}&zoom=4&size=520x320&maptype=mapnik&markers=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude},orange-pushpin`)}` : "/manus-storage/iss-map-texture_2bd39705.png";
   const currentTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(clock);
   const proximityState = prediction && prediction.distance < 2500;
   const previewStoryFailure = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-falha-nasa");
@@ -184,6 +185,9 @@ export default function Home() {
           <div className="globe-frame globe-frame-interactive" style={globeStyle}>
             <div className="globe-ocean" aria-hidden="true" />
             <div className="globe-map-overlay" aria-hidden="true" />
+            <div className="globe-relief" aria-hidden="true" />
+            <div className="globe-clouds globe-clouds-one" aria-hidden="true" />
+            <div className="globe-clouds globe-clouds-two" aria-hidden="true" />
             <div className="globe-grid globe-grid-longitude" aria-hidden="true" />
             <div className="globe-grid globe-grid-latitude" aria-hidden="true" />
             <div className="globe-terminator" aria-hidden="true" />
@@ -206,7 +210,7 @@ export default function Home() {
       <section className="object-focus-section" aria-labelledby="object-focus-title">
         <div className="object-focus-image"><img src={selectedImage} alt={`Imagem orbital de ${selectedName}`} /><div className="object-image-caption">imagem de referência · {selectedShortName}</div></div>
         <div className="object-focus-copy"><p className="eyebrow"><Crosshair size={15} aria-hidden="true" /> Objeto em foco</p><h2 id="object-focus-title">{selectedName}</h2><p>{snapshot?.satellite.category || "Objeto orbital"} · NORAD {snapshot?.satellite.noradId || "—"}. Ao selecionar outro marcador, o globo percorre a longitude correspondente e preserva todos os demais objetos na mesma leitura.</p><div className="object-focus-data"><span><MapPin size={14} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização em leitura"}</span><span><Orbit size={14} aria-hidden="true" /> {getVisibilityCopy(snapshot?.visibility)}</span></div></div>
-        <a href={snapshot?.sourceUrl || "/fontes"} target={snapshot?.sourceUrl ? "_blank" : undefined} rel="noreferrer" className="source-link object-source-link">fonte orbital <ArrowUpRight size={16} aria-hidden="true" /></a>
+        <aside className="object-ground-portrait"><img src={groundPortraitUrl} alt={snapshot ? `Mapa do ponto suborbital de ${selectedName} em ${snapshot.groundLocation.label}` : "Mapa do ponto suborbital em leitura"} onError={event => { event.currentTarget.src = "/manus-storage/iss-map-texture_2bd39705.png"; }} /><div className="ground-portrait-overlay"><span>retrato terrestre</span><strong>{snapshot?.groundLocation.label || "localização em leitura"}</strong><small>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</small><a href={snapshot?.sourceUrl || "/fontes"} target={snapshot?.sourceUrl ? "_blank" : undefined} rel="noreferrer">fonte orbital <ArrowUpRight size={13} aria-hidden="true" /></a></div></aside>
       </section>
 
       <section className="telemetry-strip" aria-label={`Telemetria atual de ${selectedShortName}`}>

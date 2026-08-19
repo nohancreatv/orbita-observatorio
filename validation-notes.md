@@ -20,3 +20,14 @@ O teste executável `server/orbitVisual.test.ts` confirmou a centralização do 
 O teste ponta a ponta isolado concluiu com sucesso: a seleção do Hubble alterou o rótulo do marcador ativo, o título e a imagem do cartão, além da variável de rotação do globo de `62.29deg` para `-129.11deg`.
 
 A prova ponta a ponta ampliada confirmou o fluxo completo em uma única interação: Hubble ficou ativo, o globo alterou sua rotação, a imagem e o título do cartão foram atualizados, e a telemetria recebeu altitude de 469,3 km, velocidade de 27.493 km/h e a localização “Mar das Filipinas”.
+
+O refinamento 3D foi validado no navegador automatizado: a troca de foco do Hubble atualizou o painel de telemetria e o local suborbital, enquanto a duração computada da rotação do globo foi `0.5s`.
+
+A captura móvel posterior ao refinamento confirmou a leitura do globo com continentes, nuvens, foco laranja, cartão do objeto e retrato suborbital sem quebra de hierarquia ou sobreposição crítica.
+
+## Validação consolidada do globo 3D
+
+| Viewport | Interação validada | Evidência |
+| --- | --- | --- |
+| Desktop, 1280×720 | Troca ISS → Hubble; marcador, imagem, telemetria, local e rotação atualizados. | Teste E2E isolado e captura de desktop. |
+| Mobile, 390×844 | Troca ISS → Hubble; painel geográfico legível e duração computada de rotação `0.5s`. | Teste E2E móvel, com artefato `hubble-focus-e2e-mobile.png`. |

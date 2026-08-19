@@ -30,3 +30,11 @@
 - [x] Registrar uma evidência única da interação completa com marcador, imagem e telemetria atualizados.
 - [x] Integrar as condições locais de nuvens e visibilidade após autorização de localização.
 - [x] Adicionar uma linha do tempo curta de próximos lançamentos com dados públicos e tratamento de indisponibilidade.
+- [x] Ajustar a rotação de foco do globo para 0,5 segundo.
+- [x] Criar camadas 3D mais ricas de relevo, continentes, iluminação e nuvens sobre a superfície terrestre.
+- [x] Ampliar o painel do objeto com nome, imagem e um retrato visual/textual do local suborbital.
+- [x] Validar em desktop e celular a nova animação e a legibilidade do globo 3D.
+- [x] Validar em celular a rotação de 0,5 segundo e a legibilidade do painel geográfico refinado.
+- [x] Registrar uma evidência final única que cubra o globo 3D em desktop e celular.
+- [x] Validar em celular a troca de foco com rotação de 0,5 segundo e painel geográfico legível.
+- [x] Consolidar em um único registro os artefatos de validação desktop e celular do globo 3D.

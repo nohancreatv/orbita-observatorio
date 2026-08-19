@@ -13,7 +13,7 @@ export const productionSecurityHeaders: RequestHandler = (req, res, next) => {
     "script-src 'self' https://*.manus.computer https://*.manus.space",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://*.nasa.gov",
+    "img-src 'self' data: https://*.nasa.gov https://staticmap.openstreetmap.de",
     "connect-src 'self'",
     "upgrade-insecure-requests",
   ].join("; ");

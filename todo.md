@@ -15,3 +15,18 @@
 - [x] Simular indisponibilidade da telemetria ISS/CelesTrak e validar a mensagem pública de contingência.
 - [x] Simular indisponibilidade da NASA APOD e validar o estado de erro do módulo de curiosidades.
 - [x] Simular falha de geocodificação reversa e validar o fallback de localização apresentado ao visitante.
+- [x] Consultar todas as posições orbitais ativas em uma única leitura para manter o globo sincronizado.
+- [x] Exibir ISS, Hubble, Tiangong e NOAA 19 simultaneamente sobre o globo com marcadores diferenciados.
+- [x] Fazer o globo girar de modo suave até o satélite ou estação selecionada e destacar seu ping em laranja.
+- [x] Aprimorar o globo com continentes, grade, terminador, rótulos e indicador de localização selecionada mais identificáveis.
+- [x] Mostrar imagem, categoria, dados e localização do objeto selecionado em um cartão orbital dedicado.
+- [x] Adicionar uma camada útil de observação, com filtro de objetos, estados de visibilidade e melhor contexto de passagem.
+- [x] Validar interação multiobjetos, rotação, resposta móvel e dados atualizados antes do novo checkpoint.
+- [x] Validar em tempo de execução a seleção de um objeto secundário e a atualização do marcador, telemetria e cartão.
+- [x] Registrar evidência executável da rotação do globo quando o objeto selecionado muda.
+- [x] Validar no navegador a troca para um objeto secundário, incluindo marcador, telemetria e cartão de imagem.
+- [x] Registrar evidência de execução da interação completa de foco entre objetos orbitais.
+- [x] Estender o teste ponta a ponta para confirmar telemetria e localização após selecionar um objeto secundário.
+- [x] Registrar uma evidência única da interação completa com marcador, imagem e telemetria atualizados.
+- [x] Integrar as condições locais de nuvens e visibilidade após autorização de localização.
+- [x] Adicionar uma linha do tempo curta de próximos lançamentos com dados públicos e tratamento de indisponibilidade.

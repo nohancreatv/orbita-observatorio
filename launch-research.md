@@ -13,3 +13,12 @@
 O rastreamento sairá do navegador para rotas de servidor com validação de parâmetros, tempos máximos de resposta, cache e limites de frequência. Assim, a chave da NASA não fica exposta, a dependência de CORS é reduzida e é possível registrar falhas sem coletar localização precisa do visitante.
 
 O lançamento deverá usar HTTPS, domínio configurado, cabeçalhos de segurança no servidor, política de privacidade acessível, termos de uso, atribuição das fontes de dados e uma página de status/limitações. Dados de localização serão consultados somente após ação explícita da pessoa e nunca serão persistidos pela aplicação.
+
+## Extensões de observação selecionadas
+
+| Recurso | Fonte | Uso previsto |
+| --- | --- | --- |
+| Janela de observação | [Open-Meteo Forecast API](https://open-meteo.com/en/docs) | Consultar cobertura total de nuvens, visibilidade e condição atual para as coordenadas autorizadas pelo visitante. |
+| Linha do tempo espacial | [Launch Library 2](https://ll.thespacedevs.com/docs/) | Exibir uma lista curta de próximos lançamentos com horário, missão, provedor e local de lançamento. |
+
+O Open-Meteo documenta variáveis horárias de cobertura de nuvens e visibilidade por coordenadas. A linha do tempo de lançamentos será tratada como um contexto editorial de baixa frequência, com cache no servidor e indicação clara de quando a fonte estiver indisponível.

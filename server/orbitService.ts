@@ -70,6 +70,23 @@ type ApodProviderData = {
   copyright?: string;
 };
 
+type WeatherProviderData = {
+  current?: { time?: string; cloud_cover?: number; visibility?: number; weather_code?: number };
+  timezone_abbreviation?: string;
+};
+
+type LaunchProviderData = {
+  results?: Array<{
+    id?: string;
+    name?: string;
+    net?: string;
+    status?: { name?: string };
+    launch_service_provider?: { name?: string };
+    pad?: { location?: { name?: string } };
+    image?: { image_url?: string };
+  }>;
+};
+
 export type GroundLocation = {
   city: string | null;
   country: string | null;
@@ -203,6 +220,74 @@ export async function getOrbitSnapshot(satelliteId: SatelliteId): Promise<OrbitS
   const snapshot = await getCelesTrakSnapshot(satelliteId);
   const groundLocation = await resolveGroundLocation(snapshot.latitude, snapshot.longitude);
   return { ...snapshot, groundLocation };
+}
+
+/**
+ * Reúne a constelação disponível em uma única consulta de interface.
+ * Falhas pontuais de uma fonte não escondem os demais objetos orbitais.
+ */
+export async function getOrbitSnapshots(): Promise<OrbitSnapshot[]> {
+  const requested = Object.keys(SATELLITE_CATALOG) as SatelliteId[];
+  const settled = await Promise.allSettled(requested.map(getOrbitSnapshot));
+  return settled.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
+}
+
+export type ObservingConditions = {
+  cloudCover: number | null;
+  visibilityKm: number | null;
+  weatherCode: number | null;
+  observedAt: string | null;
+  timezone: string | null;
+  sourceUrl: string;
+};
+
+export async function getObservingConditions(latitude: number, longitude: number): Promise<ObservingConditions> {
+  const roundedLat = Math.round(latitude * 10) / 10;
+  const roundedLon = Math.round(longitude * 10) / 10;
+  return withCache(`weather:${roundedLat}:${roundedLon}`, 15 * 60_000, async () => {
+    const url = new URL("https://api.open-meteo.com/v1/forecast");
+    url.searchParams.set("latitude", String(roundedLat));
+    url.searchParams.set("longitude", String(roundedLon));
+    url.searchParams.set("current", "cloud_cover,visibility,weather_code");
+    url.searchParams.set("timezone", "auto");
+    const data = await fetchJson<WeatherProviderData>(url.toString(), 10_000);
+    return {
+      cloudCover: typeof data.current?.cloud_cover === "number" ? data.current.cloud_cover : null,
+      visibilityKm: typeof data.current?.visibility === "number" ? data.current.visibility / 1000 : null,
+      weatherCode: typeof data.current?.weather_code === "number" ? data.current.weather_code : null,
+      observedAt: data.current?.time || null,
+      timezone: data.timezone_abbreviation || null,
+      sourceUrl: "https://open-meteo.com/en/docs",
+    };
+  });
+}
+
+export type UpcomingLaunch = { id: string; name: string; timestamp: string | null; status: string; provider: string; location: string; imageUrl: string | null; sourceUrl: string };
+
+function safeLaunchImage(url: string | undefined) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getUpcomingLaunches(): Promise<UpcomingLaunch[]> {
+  return withCache("launches:upcoming", 20 * 60_000, async () => {
+    const data = await fetchJson<LaunchProviderData>("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=3", 12_000);
+    return (data.results || []).map((launch, index) => ({
+      id: launch.id || `launch-${index}`,
+      name: launch.name?.slice(0, 180) || "Lançamento a confirmar",
+      timestamp: launch.net || null,
+      status: launch.status?.name || "horário a confirmar",
+      provider: launch.launch_service_provider?.name || "provedor não informado",
+      location: launch.pad?.location?.name || "local não informado",
+      imageUrl: safeLaunchImage(launch.image?.image_url),
+      sourceUrl: "https://ll.thespacedevs.com/",
+    }));
+  });
 }
 
 function distanceKm(latitudeA: number, longitudeA: number, latitudeB: number, longitudeB: number) {

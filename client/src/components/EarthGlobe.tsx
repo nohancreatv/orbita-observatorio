@@ -1,5 +1,4 @@
-import { useTexture } from "@react-three/drei";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -62,7 +61,7 @@ function useReducedMotion() {
 }
 
 function EarthSurface() {
-  const [dayMap, nightMap] = useTexture([DAY_MAP, NIGHT_MAP]);
+  const [dayMap, nightMap] = useLoader(THREE.TextureLoader, [DAY_MAP, NIGHT_MAP]);
 
   useMemo(() => {
     [dayMap, nightMap].forEach(texture => {
@@ -86,7 +85,7 @@ function EarthSurface() {
 }
 
 function CloudLayer() {
-  const cloudMap = useTexture(CLOUD_MAP);
+  const cloudMap = useLoader(THREE.TextureLoader, CLOUD_MAP);
   useMemo(() => {
     cloudMap.colorSpace = THREE.SRGBColorSpace;
     cloudMap.anisotropy = 4;

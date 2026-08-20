@@ -68,3 +68,14 @@
 - [x] Garantir que o mapa e as informações do local tenham altura equilibrada, sem área vazia excessiva.
 - [x] Tornar a rotação de 0,5 segundo visivelmente perceptível entre os satélites selecionados.
 - [x] Validar o painel terrestre e a transição orbital em desktop e celular.
+- [x] Auditar front-end, servidor, dependências e ativos para identificar riscos de produção.
+- [x] Extrair componentes reutilizáveis e reduzir complexidade do componente de página principal.
+- [x] Implementar layout de três colunas com espaços laterais semânticos para Google Ads no desktop.
+- [x] Definir comportamento dos espaços de anúncios no mobile sem prejudicar leitura ou CLS.
+- [x] Melhorar estados de carregamento, erro e indisponibilidade dos dados públicos.
+- [x] Otimizar LCP, CLS, carregamento de imagens e custo de renderização do globo.
+- [x] Ampliar validações automatizadas de layout, acessibilidade, respostas de erro e regressões principais.
+- [x] Preparar e entregar o changelog técnico da primeira rodada.
+- [x] Adicionar placeholders de altura fixa para telemetria, agenda de lançamentos e curiosidade NASA durante o carregamento assíncrono.
+- [x] Revisar a divisão do bundle do globo e registrar o impacto do carregamento diferido no artefato de produção.
+- [x] Criar uma regressão automatizada para as trilhas publicitárias desktop, o slot móvel e requisitos básicos de acessibilidade.

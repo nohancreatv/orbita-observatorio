@@ -151,6 +151,6 @@
 - [x] Reproduzir a tela de recuperação recorrente no domínio Netlify e identificar o erro de cliente ou função que a provoca.
 - [x] Corrigir a causa da recuperação repetida sem mascarar falhas nem expor detalhes sensíveis.
 - [x] Cobrir a regressão com testes de produção e publicar somente após confirmação do usuário.
-- [ ] Verificar autenticação GitHub, remoto atual e estado de alterações locais antes da publicação.
-- [ ] Revisar arquivos e segredos, definindo um repositório GitHub seguro para o observatório.
-- [ ] Criar ou conectar o repositório remoto e enviar o código após confirmação do usuário.
+- [x] Verificar autenticação GitHub, remoto atual e estado de alterações locais antes da publicação.
+- [x] Revisar arquivos e segredos, definindo um repositório GitHub seguro para o observatório.
+- [x] Criar ou conectar o repositório remoto e enviar o código após confirmação do usuário.

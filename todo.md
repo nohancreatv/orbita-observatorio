@@ -162,3 +162,7 @@
 - [ ] Preservar o Publisher ID público do AdSense no build automatizado para evitar regressão de monetização no deploy por Actions.
 - [ ] Corrigir o conflito entre a versão do pnpm declarada no projeto e a configuração do GitHub Actions.
 - [ ] Corrigir a falha dos testes Vitest no runner GitHub Actions sem reduzir a cobertura de regressão.
+- [ ] Corrigir a autenticação do deploy Netlify no GitHub Actions após a validação aprovada.
+- [ ] Tornar o código de verificação do AdSense detectável pelo rastreador na página pública.
+- [ ] Preservar o bloqueio de anúncios e requisições publicitárias até o consentimento explícito do visitante.
+- [ ] Validar a presença do código no HTML de produção e orientar uma nova solicitação de verificação AdSense.

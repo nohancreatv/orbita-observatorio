@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type ConsentPreferences = { advertising: boolean; updatedAt: string; version: 1 };
+type AdsbygoogleQueue = unknown[] & { pauseAdRequests?: number; orbitaAutoAdsStarted?: boolean };
 type ConsentContextValue = {
   isReady: boolean;
   preferences: ConsentPreferences | null;
@@ -15,7 +16,7 @@ declare global {
   interface Window {
     dataLayer?: unknown[][];
     gtag?: (...args: unknown[]) => void;
-    adsbygoogle?: unknown[];
+    adsbygoogle?: AdsbygoogleQueue;
   }
 }
 
@@ -31,16 +32,15 @@ function updateGoogleConsent(advertising: boolean, mode: "default" | "update") {
   });
 }
 
-function loadAdsScript() {
+function updateAdRequestPause(advertising: boolean) {
   const publisherId = import.meta.env.VITE_ADSENSE_PUBLISHER_ID?.trim();
-  if (!publisherId || document.getElementById("orbita-adsense-script")) return;
-  const script = document.createElement("script");
-  script.id = "orbita-adsense-script";
-  script.async = true;
-  script.crossOrigin = "anonymous";
-  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(publisherId)}`;
-  script.addEventListener("load", () => window.dispatchEvent(new Event("orbita:adsense-ready")), { once: true });
-  document.head.append(script);
+  const ads = (window.adsbygoogle = window.adsbygoogle || []);
+  ads.pauseAdRequests = advertising ? 0 : 1;
+
+  if (!advertising || !publisherId || ads.orbitaAutoAdsStarted) return;
+  ads.orbitaAutoAdsStarted = true;
+  ads.push({ google_ad_client: publisherId, enable_page_level_ads: true });
+  window.dispatchEvent(new Event("orbita:adsense-ready"));
 }
 
 export function ConsentProvider({ children }: { children: ReactNode }) {
@@ -65,7 +65,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!preferences) return;
     updateGoogleConsent(preferences.advertising, "update");
-    if (preferences.advertising) loadAdsScript();
+    updateAdRequestPause(preferences.advertising);
   }, [preferences]);
 
   const savePreferences = useCallback((advertising: boolean) => {
@@ -78,6 +78,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
     setPreferences(null);
     updateGoogleConsent(false, "update");
+    updateAdRequestPause(false);
   }, []);
 
   const value = useMemo(() => ({ isReady, preferences, savePreferences, clearPreferences }), [clearPreferences, isReady, preferences, savePreferences]);

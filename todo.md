@@ -64,3 +64,7 @@
 - [x] Validar em desktop e celular as transições entre ISS, Hubble, Tiangong e NOAA 19, incluindo rotação, marcadores e telemetria.
 - [x] Registrar a saída consolidada das transições multiobjeto no arquivo de validação.
 - [x] Persistir e confirmar a sequência completa de transições orbitais em desktop e celular.
+- [x] Substituir o espaço vazio do retrato terrestre por detalhes legíveis da localização suborbital.
+- [x] Garantir que o mapa e as informações do local tenham altura equilibrada, sem área vazia excessiva.
+- [x] Tornar a rotação de 0,5 segundo visivelmente perceptível entre os satélites selecionados.
+- [x] Validar o painel terrestre e a transição orbital em desktop e celular.

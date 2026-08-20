@@ -204,8 +204,9 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
     return () => window.clearTimeout(timer);
   }, [selectedId]);
   const markerGeometry = JSON.stringify(markers.map(marker => ({ id: marker.id, latitude: marker.latitude, longitude: marker.longitude })));
-  return <div className={`three-globe ${className}`} data-renderer="react-three-fiber" data-active-marker={selectedId} data-transition-from={markerTransition.fromId || ""} data-transition-to={markerTransition.toId} data-marker-count={markers.length} data-marker-geometry={markerGeometry} data-focus-longitude={selectedMarker?.longitude ?? 0} data-focus-duration={FOCUS_DURATION_MS} data-reduced-motion={reducedMotion} aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}>
-    <Canvas dpr={[1, 1.25]} frameloop="demand" camera={{ position: [0, 0, 3.2], fov: 38 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} fallback={<GlobeFallback />}>
+  const isTransitioning = Boolean(markerTransition.fromId) && !reducedMotion;
+  return <div className={`three-globe ${className}`} data-renderer="react-three-fiber" data-active-marker={selectedId} data-transition-from={markerTransition.fromId || ""} data-transition-to={markerTransition.toId} data-is-transitioning={isTransitioning} data-marker-count={markers.length} data-marker-geometry={markerGeometry} data-focus-longitude={selectedMarker?.longitude ?? 0} data-focus-duration={FOCUS_DURATION_MS} data-reduced-motion={reducedMotion} aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}>
+    <Canvas dpr={[1, 1.25]} frameloop={isTransitioning ? "always" : "demand"} camera={{ position: [0, 0, 3.2], fov: 38 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} fallback={<GlobeFallback />}>
       <Suspense fallback={null}><GlobeScene markers={markers} selectedId={selectedId} markerTransition={markerTransition} onSelect={onSelect} reducedMotion={reducedMotion} /></Suspense>
     </Canvas>
   </div>;

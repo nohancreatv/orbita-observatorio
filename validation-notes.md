@@ -35,6 +35,8 @@ O recorte de rótulos foi corrigido: somente o objeto em foco recebe rótulo no 
 
 O ciclo de foco agora foi validado em desktop e celular: ao selecionar Hubble, o estado de transição registra ISS como origem e Hubble como destino, a longitude de foco muda, o marcador laranja transfere seu destaque durante 500 ms e a origem é removida ao término da rotação.
 
+Na correção de composição, o retrato terrestre passou a apresentar tipo de superfície e estado orbital, enquanto a altura é limitada em telas médias. As capturas pós-correção confirmaram que o painel não apresenta mais uma faixa vazia desproporcional. A transição de foco ativa o loop de renderização do canvas e um arco de varredura durante 500 ms, tornando o giro perceptível sem custo contínuo fora da troca.
+
 ### Transições multiobjeto
 
 O teste `verify-orbit-transitions.mjs` confirmou em desktop e celular a sequência ISS → Hubble → Tiangong → NOAA 19 → ISS. Em todas as oito execuções, a longitude do globo mudou, o par `data-transition-from/to` descreveu corretamente a troca, o marcador ativo e a telemetria foram atualizados, e o estado estabilizou após 500 ms com a origem removida.

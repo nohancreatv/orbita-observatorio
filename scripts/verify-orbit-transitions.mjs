@@ -20,23 +20,25 @@ try {
   for (const target of sequence) {
     const beforeLongitude = await page.locator(".three-globe").getAttribute("data-focus-longitude");
     await page.getByRole("button", { name: target.button, exact: true }).click();
-    await page.waitForFunction(({ from, to }) => document.querySelector(".three-globe")?.getAttribute("data-transition-from") === from && document.querySelector(".three-globe")?.getAttribute("data-transition-to") === to, { from: previous, to: target.id }, { timeout: 2_000 });
+    await page.waitForFunction(({ from, to }) => document.querySelector(".three-globe")?.getAttribute("data-transition-from") === from && document.querySelector(".three-globe")?.getAttribute("data-transition-to") === to && document.querySelector(".three-globe")?.getAttribute("data-is-transitioning") === "true", { from: previous, to: target.id }, { timeout: 2_000 });
     await page.waitForFunction(expected => document.querySelector(".three-globe")?.getAttribute("data-active-marker") === expected, target.id, { timeout: 8_000 });
     const current = await page.evaluate(() => ({
       longitude: document.querySelector(".three-globe")?.getAttribute("data-focus-longitude"),
       marker: document.querySelector(".three-globe")?.getAttribute("data-active-marker"),
       transitionFrom: document.querySelector(".three-globe")?.getAttribute("data-transition-from"),
       transitionTo: document.querySelector(".three-globe")?.getAttribute("data-transition-to"),
+      isTransitioning: document.querySelector(".three-globe")?.getAttribute("data-is-transitioning"),
       badge: document.querySelector(".globe-badge")?.textContent?.replace(/\s+/g, " ").trim(),
       telemetry: document.querySelector(".telemetry-strip")?.textContent?.replace(/\s+/g, " ").trim(),
+      groundDetails: document.querySelector(".ground-portrait-details")?.textContent?.replace(/\s+/g, " ").trim(),
     }));
-    if (current.marker !== target.id || current.transitionFrom !== previous || current.transitionTo !== target.id || current.longitude === beforeLongitude || !current.badge?.includes(target.label) || !current.telemetry?.includes("altitude") || current.telemetry.includes("—")) {
+    if (current.marker !== target.id || current.transitionFrom !== previous || current.transitionTo !== target.id || current.isTransitioning !== "true" || current.longitude === beforeLongitude || !current.badge?.includes(target.label) || !current.telemetry?.includes("altitude") || current.telemetry.includes("—") || !current.groundDetails?.includes("superfície") || !current.groundDetails?.includes("leitura")) {
       throw new Error(`Transição inválida para ${target.label}: ${JSON.stringify({ previous, target, beforeLongitude, current })}`);
     }
     await page.waitForTimeout(650);
-    const settled = await page.evaluate(() => ({ from: document.querySelector(".three-globe")?.getAttribute("data-transition-from"), to: document.querySelector(".three-globe")?.getAttribute("data-transition-to") }));
-    if (settled.from || settled.to !== target.id) throw new Error(`Transição não estabilizou para ${target.label}: ${JSON.stringify(settled)}`);
-    results.push({ from: previous, to: target.id, longitudeChanged: current.longitude !== beforeLongitude, marker: current.marker, telemetryUpdated: true, settled });
+    const settled = await page.evaluate(() => ({ from: document.querySelector(".three-globe")?.getAttribute("data-transition-from"), to: document.querySelector(".three-globe")?.getAttribute("data-transition-to"), isTransitioning: document.querySelector(".three-globe")?.getAttribute("data-is-transitioning") }));
+    if (settled.from || settled.to !== target.id || settled.isTransitioning !== "false") throw new Error(`Transição não estabilizou para ${target.label}: ${JSON.stringify(settled)}`);
+    results.push({ from: previous, to: target.id, longitudeChanged: current.longitude !== beforeLongitude, animated: current.isTransitioning === "true", marker: current.marker, telemetryUpdated: true, groundDetailsPresent: Boolean(current.groundDetails), settled });
     previous = target.id;
   }
 

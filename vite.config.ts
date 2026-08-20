@@ -153,7 +153,7 @@ function vitePluginManusDebugCollector(): Plugin {
 const isDevelopment = process.env.NODE_ENV === "development";
 
 export default defineConfig({
-  plugins: isDevelopment ? [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()] : [react(), tailwindcss(), vitePluginManusRuntime()],
+  plugins: isDevelopment ? [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()] : [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

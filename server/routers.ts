@@ -13,6 +13,7 @@ const coordinateSchema = z.number().finite();
 const orbitPublicProcedure = publicProcedure.use(({ ctx, next }) => {
   const requestIdentity = ctx.req.ip || ctx.req.socket.remoteAddress || "anonymous";
   if (isRateLimited(requestIdentity)) {
+    ctx.res.setHeader("Retry-After", "60");
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Muitas consultas em pouco tempo. Aguarde um minuto para tentar novamente." });
   }
   return next();
@@ -21,7 +22,7 @@ const orbitPublicProcedure = publicProcedure.use(({ ctx, next }) => {
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(({ ctx }) => ctx.user ? ({ name: ctx.user.name, role: ctx.user.role }) : null),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

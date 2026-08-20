@@ -111,3 +111,21 @@
 - [x] Renderizar metadados SEO e OpenGraph por rota também no HTML entregue pelo servidor, para rastreadores sem JavaScript.
 - [x] Remover analytics externo incondicional bloqueado pela CSP para alinhar privacidade, consentimento e segurança de conteúdo.
 - [x] Entregar status HTTP 404 real para rotas inexistentes, mantendo a página de recuperação e os metadados noindex.
+- [x] Inventariar segredos, dados persistidos, superfícies públicas e controles da lista que se aplicam ao observatório.
+- [x] Verificar e endurecer proteção de segredos, histórico Git e variáveis expostas no artefato público.
+- [x] Revisar autenticação OAuth, cookies de sessão e autorização no servidor para rotas que manipulem dados do usuário.
+- [x] Reforçar limites, validação, respostas e tratamento de erros nas APIs públicas orbitais.
+- [x] Confirmar proteção contra XSS, parametrização de banco, restrições de upload e ausência de campos adulteráveis.
+- [x] Revisar HTTPS, cabeçalhos, proteção contra automação abusiva e dependências de produção.
+- [x] Criar testes e relatório de hardening com justificativa para controles não aplicáveis.
+- [x] Remover fallback de token Bearer em sessionStorage e cópia de perfil em localStorage, preservando sessão somente por cookie httpOnly.
+- [x] Reduzir a exposição de dados no contrato público de autenticação e impedir alteração de função no upsert de usuário.
+- [x] Fortalecer duração e atributos de cookies OAuth e sessão para fluxo estritamente de primeira parte.
+- [x] Limitar crescimento da memória do rate limiter e devolver orientação de retry a clientes limitados.
+- [x] Cobrir em testes a ausência de tokens no cliente, o perfil público mínimo e a recuperação temporal do rate limiter.
+- [x] Validar chaves da rota pública de armazenamento e reduzir detalhes de falha expostos por esse proxy.
+- [x] Ampliar a proteção preventiva do Git contra arquivos de ambiente, certificados, chaves e credenciais locais.
+- [x] Impedir cache intermediário de respostas de API para reduzir exposição residual de sessão e perfil autenticado.
+- [x] Remover runtime inline de desenvolvimento do build publicado e restringir a política de scripts à origem própria e ao AdSense autorizado.
+- [x] Forçar o atributo Secure de cookies de sessão em produção, independentemente de cabeçalhos intermediários de proxy.
+- [x] Minimizar dados de identidade: deixar de persistir e expor e-mail OAuth, que não é utilizado pelo observatório público.

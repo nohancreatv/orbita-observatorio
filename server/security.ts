@@ -10,7 +10,7 @@ export const productionSecurityHeaders: RequestHandler = (req, res, next) => {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    "script-src 'self' https://*.manus.computer https://*.manus.space https://pagead2.googlesyndication.com",
+    "script-src 'self' https://pagead2.googlesyndication.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https://*.nasa.gov https://staticmap.openstreetmap.de https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
@@ -32,12 +32,24 @@ export const productionSecurityHeaders: RequestHandler = (req, res, next) => {
 
 type Bucket = { count: number; resetAt: number };
 const requestBuckets = new Map<string, Bucket>();
+const MAX_RATE_LIMIT_BUCKETS = 10_000;
+
+function pruneRateLimitBuckets(now: number) {
+  for (const [identity, bucket] of Array.from(requestBuckets.entries())) {
+    if (bucket.resetAt <= now) requestBuckets.delete(identity);
+  }
+  if (requestBuckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+    const oldestIdentity = requestBuckets.keys().next().value;
+    if (oldestIdentity) requestBuckets.delete(oldestIdentity);
+  }
+}
 
 /** Limite simples em memória: reduz abuso de rotas públicas sem registrar coordenadas ou perfis de visitantes. */
 export function isRateLimited(identity: string, limit = 60, windowMs = 60_000) {
   const now = Date.now();
   const bucket = requestBuckets.get(identity);
   if (!bucket || bucket.resetAt <= now) {
+    pruneRateLimitBuckets(now);
     requestBuckets.set(identity, { count: 1, resetAt: now + windowMs });
     return false;
   }

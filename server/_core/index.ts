@@ -37,6 +37,10 @@ async function startServer() {
   app.use(productionSecurityHeaders);
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ limit: "1mb", extended: true }));
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+    next();
+  });
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   // tRPC API

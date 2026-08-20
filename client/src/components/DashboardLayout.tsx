@@ -213,7 +213,7 @@ function DashboardLayoutContent({
                       {user?.name || "-"}
                     </p>
                     <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
+                      {user?.role === "admin" ? "administração" : "sessão autenticada"}
                     </p>
                   </div>
                 </button>

@@ -134,3 +134,23 @@
 - [x] Converter respostas 429 externas em dados recentes preservados ou estado de contingência não disruptivo.
 - [x] Cobrir 429 externo com teste de regressão e validar a página sem erro de consulta visível.
 - [x] Publicar o diagnóstico e a correção do limite de taxa externo.
+- [x] Analisar o diagnóstico de erro ao vincular domínio enviado pelo usuário e identificar a origem técnica.
+- [x] Aplicar a configuração ou correção segura necessária para o domínio, sem degradar a publicação atual.
+- [x] Validar a resolução do domínio e registrar o changelog técnico da correção.
+- [x] Definir se o domínio será vinculado à hospedagem Manus atual ou se o projeto será adaptado para infraestrutura Netlify compatível com o servidor tRPC.
+- [x] Definir a adaptação do projeto para infraestrutura Netlify compatível com o servidor tRPC.
+- [x] Mapear dependências do servidor, rotas tRPC e variáveis de ambiente necessárias à execução em funções Netlify.
+- [x] Criar adaptador e configuração de build para Netlify sem publicar conteúdo estático que interrompa as APIs orbitais.
+- [x] Validar a build compatível e os fluxos públicos antes de iniciar uma nova publicação externa.
+- [x] Publicar a versão adaptada no projeto Netlify e validar a URL de produção.
+- [x] Estabilizar o disparo e a validação E2E da transição orbital de 500 ms sob carga de inicialização do globo.
+- [x] Corrigir o empacotamento de dependências transitivas do Express na função Netlify, que retornou 502 em produção por módulo ausente.
+- [x] Corrigir a resolução de módulo ESM de `satellite.js` na função Netlify, que ainda retorna 502 na API orbital publicada.
+- [x] Verificar e versionar o changelog técnico completo da migração Netlify antes do checkpoint.
+- [x] Preservar o domínio Manus atual sem checkpoint ou publicação desta migração, conforme solicitado pelo usuário.
+- [x] Reproduzir a tela de recuperação recorrente no domínio Netlify e identificar o erro de cliente ou função que a provoca.
+- [x] Corrigir a causa da recuperação repetida sem mascarar falhas nem expor detalhes sensíveis.
+- [x] Cobrir a regressão com testes de produção e publicar somente após confirmação do usuário.
+- [ ] Verificar autenticação GitHub, remoto atual e estado de alterações locais antes da publicação.
+- [ ] Revisar arquivos e segredos, definindo um repositório GitHub seguro para o observatório.
+- [ ] Criar ou conectar o repositório remoto e enviar o código após confirmação do usuário.

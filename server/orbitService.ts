@@ -192,7 +192,7 @@ async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): P
     const satrec = satellite.twoline2satrec(lines[1], lines[2]);
     const now = new Date();
     const propagated = satellite.propagate(satrec, now);
-    if (!propagated || !propagated.position || !propagated.velocity || typeof propagated.position === "boolean") {
+    if (!propagated || !propagated.position || !propagated.velocity || typeof propagated.position === "boolean" || typeof propagated.velocity === "boolean") {
       throw new Error("Não foi possível propagar a órbita selecionada.");
     }
 

@@ -24,20 +24,22 @@ try {
     // 500 ms é aplicado após o commit React. Esperar um frame estável evita que a
     // sondagem por RAF perca essa janela em WebGL headless sob carga.
     await page.waitForTimeout(100);
-    await page.waitForFunction(({ from, to }) => {
+    const transitionSnapshot = await page.waitForFunction(({ from, to }) => {
       const globe = document.querySelector(".three-globe");
-      return globe?.getAttribute("data-transition-from") === from && globe?.getAttribute("data-transition-to") === to && globe?.getAttribute("data-is-transitioning") === "true" && globe?.getAttribute("data-active-marker") === to;
+      const isTransitioning = globe?.getAttribute("data-transition-from") === from && globe?.getAttribute("data-transition-to") === to && globe?.getAttribute("data-is-transitioning") === "true" && globe?.getAttribute("data-active-marker") === to;
+      if (!isTransitioning) return false;
+      return {
+        longitude: globe?.getAttribute("data-focus-longitude"),
+        marker: globe?.getAttribute("data-active-marker"),
+        transitionFrom: globe?.getAttribute("data-transition-from"),
+        transitionTo: globe?.getAttribute("data-transition-to"),
+        isTransitioning: globe?.getAttribute("data-is-transitioning"),
+        badge: document.querySelector(".globe-badge")?.textContent?.replace(/\s+/g, " ").trim(),
+        telemetry: document.querySelector(".telemetry-strip")?.textContent?.replace(/\s+/g, " ").trim(),
+        groundDetails: document.querySelector(".ground-portrait-details")?.textContent?.replace(/\s+/g, " ").trim(),
+      };
     }, { from: previous, to: target.id }, { timeout: 5_000 });
-    const current = await page.evaluate(() => ({
-      longitude: document.querySelector(".three-globe")?.getAttribute("data-focus-longitude"),
-      marker: document.querySelector(".three-globe")?.getAttribute("data-active-marker"),
-      transitionFrom: document.querySelector(".three-globe")?.getAttribute("data-transition-from"),
-      transitionTo: document.querySelector(".three-globe")?.getAttribute("data-transition-to"),
-      isTransitioning: document.querySelector(".three-globe")?.getAttribute("data-is-transitioning"),
-      badge: document.querySelector(".globe-badge")?.textContent?.replace(/\s+/g, " ").trim(),
-      telemetry: document.querySelector(".telemetry-strip")?.textContent?.replace(/\s+/g, " ").trim(),
-      groundDetails: document.querySelector(".ground-portrait-details")?.textContent?.replace(/\s+/g, " ").trim(),
-    }));
+    const current = await transitionSnapshot.jsonValue();
     if (current.marker !== target.id || current.transitionFrom !== previous || current.transitionTo !== target.id || current.isTransitioning !== "true" || current.longitude === beforeLongitude || !current.badge?.includes(target.label) || !current.telemetry?.includes("altitude") || current.telemetry.includes("—") || !current.groundDetails?.includes("superfície") || !current.groundDetails?.includes("leitura")) {
       throw new Error(`Transição inválida para ${target.label}: ${JSON.stringify({ previous, target, beforeLongitude, current })}`);
     }

@@ -1,4 +1,4 @@
-import { Html, useTexture } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -121,9 +121,6 @@ function SatelliteMarker({ marker, active, onSelect }: { marker: Marker; active:
       <sphereGeometry args={[active ? 0.045 : 0.032, 16, 16]} />
       <meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} />
     </mesh>
-    <Html center distanceFactor={6.2} zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
-      <span className={active ? "three-marker-label is-active" : "three-marker-label"}>{marker.shortName}</span>
-    </Html>
   </group>;
 }
 
@@ -174,7 +171,8 @@ function GlobeFallback() {
 export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "" }: EarthGlobeProps) {
   const selectedMarker = markers.find(marker => marker.id === selectedId);
   const reducedMotion = useReducedMotion();
-  return <div className={`three-globe ${className}`} data-renderer="react-three-fiber" data-active-marker={selectedId} data-focus-longitude={selectedMarker?.longitude ?? 0} data-focus-duration={FOCUS_DURATION_MS} data-reduced-motion={reducedMotion} aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}>
+  const markerGeometry = JSON.stringify(markers.map(marker => ({ id: marker.id, latitude: marker.latitude, longitude: marker.longitude })));
+  return <div className={`three-globe ${className}`} data-renderer="react-three-fiber" data-active-marker={selectedId} data-marker-count={markers.length} data-marker-geometry={markerGeometry} data-focus-longitude={selectedMarker?.longitude ?? 0} data-focus-duration={FOCUS_DURATION_MS} data-reduced-motion={reducedMotion} aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}>
     <Canvas dpr={[1, 1.25]} frameloop="demand" camera={{ position: [0, 0, 3.2], fov: 38 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} fallback={<GlobeFallback />}>
       <Suspense fallback={null}><GlobeScene markers={markers} selectedId={selectedId} onSelect={onSelect} reducedMotion={reducedMotion} /></Suspense>
     </Canvas>

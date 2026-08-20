@@ -48,3 +48,13 @@
 - [x] Revalidar os estados de contingência de telemetria, geolocalização, geocodificação e NASA com o globo 3D ativo.
 - [x] Executar uma verificação objetiva de desempenho do globo 3D e registrar as métricas de renderização em desktop e celular.
 - [x] Registrar em arquivo de validação as métricas de renderização desktop e celular do globo 3D, incluindo canvas e marcadores.
+- [x] Remover rótulos periféricos recortados e manter a identificação visual somente no objeto em foco.
+- [x] Garantir que o rótulo do objeto selecionado fique dentro da área útil do globo em desktop e celular.
+- [x] Validar a troca de foco sem sobreposição ou recorte de marcadores e rótulos.
+- [x] Validar os rótulos do globo em desktop e celular após a correção de recorte.
+- [x] Verificar em múltiplos objetos a troca de foco sem sobreposição ou recorte de marcadores e rótulos.
+- [x] Validar em desktop e celular que os quatro marcadores 3D permanecem visíveis e sem sobreposição problemática.
+- [x] Registrar evidência pós-correção dos marcadores e do foco em múltiplos objetos.
+- [x] Validar executavelmente os quatro marcadores 3D em desktop e celular, incluindo limites e ausência de colisão problemática.
+- [x] Registrar a saída da validação de marcadores pós-correção no arquivo de evidências.
+- [x] Persistir e confirmar a saída final da validação de marcadores em desktop e celular.

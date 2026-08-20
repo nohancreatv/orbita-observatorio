@@ -31,6 +31,16 @@ O globo CSS foi substituído por um canvas React Three Fiber com textura diurna,
 
 Os quatro estados de contingência foram revalidados com o canvas ativo: telemetria indisponível, NASA APOD indisponível, geolocalização negada e geocodificação indisponível. A medição sustentada após aquecimento de texturas registrou 41,49 ms médios / 63,2 ms p95 no viewport desktop e 21,46 ms médios / 41,9 ms p95 no móvel, cada um com um único canvas e quatro marcadores.
 
+O recorte de rótulos foi corrigido: somente o objeto em foco recebe rótulo no canvas, e o teste em viewport 482×479 confirmou que “Hubble” permaneceu integralmente dentro da área útil do globo.
+
+A correção definitiva substituiu rótulos HTML flutuantes por identificação no painel externo de foco. A validação percorreu ISS, Hubble, Tiangong e NOAA 19 em desktop e celular: o canvas teve zero rótulos suscetíveis a recorte, enquanto o painel externo exibiu corretamente o nome, a coordenada e o local de cada objeto.
+
+As capturas pós-correção confirmam que os quatro marcadores permanecem como pings compactos dentro da esfera, sem texto atravessando a borda. Em desktop, a leitura foi validada com NOAA 19 em foco; em celular, o seletor, o status e a área do globo permanecem legíveis, sem sobreposição de rótulos no canvas.
+
+### Marcadores pós-correção — validação E2E
+
+O teste geométrico percorreu ISS, Hubble, Tiangong e NOAA 19 nos viewports desktop e mobile. Em todos os oito focos, a asserção encontrou quatro marcadores no canvas, o marcador ativo dentro da área do globo e nenhuma colisão projetada entre marcadores frontais (`closePairs: []`). O canvas continuou sem rótulos HTML (`canvasLabelCount: 0`), e o painel externo confirmou a identificação do objeto e seu local suborbital.
+
 ## Validação consolidada do globo 3D
 
 | Viewport | Interação validada | Evidência |

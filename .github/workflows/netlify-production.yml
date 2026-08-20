@@ -1,0 +1,76 @@
+name: Validar e publicar no Netlify
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netlify-producao
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validar aplicação
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Verificar tipos
+        run: pnpm check
+
+      - name: Executar testes
+        run: pnpm test
+
+      - name: Validar build e função Netlify
+        run: pnpm exec netlify build --offline
+        env:
+          VITE_ADSENSE_PUBLISHER_ID: ca-pub-5884730150482896
+
+  deploy:
+    name: Publicar produção
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Publicar no Netlify
+        run: pnpm exec netlify deploy --prod --build --message "GitHub Actions • $GITHUB_SHA"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ed790cb7-fd05-4528-9ea7-54631f824a72
+          VITE_ADSENSE_PUBLISHER_ID: ca-pub-5884730150482896

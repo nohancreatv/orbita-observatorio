@@ -154,3 +154,9 @@
 - [x] Verificar autenticação GitHub, remoto atual e estado de alterações locais antes da publicação.
 - [x] Revisar arquivos e segredos, definindo um repositório GitHub seguro para o observatório.
 - [x] Criar ou conectar o repositório remoto e enviar o código após confirmação do usuário.
+- [x] Mapear os segredos e comandos necessários para o deploy Netlify disparado por GitHub Actions.
+- [x] Criar workflow GitHub Actions para validar e publicar automaticamente a branch principal no Netlify.
+- [x] Adicionar README.md detalhado com arquitetura, pré-requisitos, comandos locais, variáveis e testes.
+- [ ] Validar e publicar a automação e a documentação no repositório GitHub privado.
+- [ ] Remover a dependência da variável de repositório bloqueada pela permissão GitHub, mantendo o identificador público do site no workflow.
+- [ ] Preservar o Publisher ID público do AdSense no build automatizado para evitar regressão de monetização no deploy por Actions.

@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import * as THREE from "three";
+import { AdditiveBlending, BackSide, Color, DoubleSide, Group, MathUtils, MeshStandardMaterial, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector3 } from "three";
 
 const DAY_MAP = "/manus-storage/earth-day-atlas_ee47322f.jpg";
 const NIGHT_MAP = "/manus-storage/earth-night-atlas_06d895db.jpg";
@@ -39,9 +39,9 @@ export type EarthGlobeProps = {
 };
 
 function toCartesian(latitude: number, longitude: number, radius: number) {
-  const latitudeRadians = THREE.MathUtils.degToRad(latitude);
-  const longitudeRadians = THREE.MathUtils.degToRad(longitude);
-  return new THREE.Vector3(
+  const latitudeRadians = MathUtils.degToRad(latitude);
+  const longitudeRadians = MathUtils.degToRad(longitude);
+  return new Vector3(
     radius * Math.cos(latitudeRadians) * Math.sin(longitudeRadians),
     radius * Math.sin(latitudeRadians),
     radius * Math.cos(latitudeRadians) * Math.cos(longitudeRadians),
@@ -61,59 +61,59 @@ function useReducedMotion() {
 }
 
 function EarthSurface() {
-  const [dayMap, nightMap] = useLoader(THREE.TextureLoader, [DAY_MAP, NIGHT_MAP]);
+  const [dayMap, nightMap] = useLoader(TextureLoader, [DAY_MAP, NIGHT_MAP]);
 
   useMemo(() => {
     [dayMap, nightMap].forEach(texture => {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = 4;
+      texture.colorSpace = SRGBColorSpace;
+      texture.anisotropy = 2;
     });
   }, [dayMap, nightMap]);
 
-  const material = useMemo(() => new THREE.MeshStandardMaterial({
+  const material = useMemo(() => new MeshStandardMaterial({
     map: dayMap,
     emissiveMap: nightMap,
-    emissive: new THREE.Color("#193b58"),
+    emissive: new Color("#193b58"),
     emissiveIntensity: 0.36,
     roughness: 0.76,
     metalness: 0.04,
   }), [dayMap, nightMap]);
 
   return <mesh material={material} rotation={[0, -Math.PI / 2, 0]}>
-    <sphereGeometry args={[1, 72, 72]} />
+    <sphereGeometry args={[1, 56, 56]} />
   </mesh>;
 }
 
 function CloudLayer() {
-  const cloudMap = useLoader(THREE.TextureLoader, CLOUD_MAP);
+  const cloudMap = useLoader(TextureLoader, CLOUD_MAP);
   useMemo(() => {
-    cloudMap.colorSpace = THREE.SRGBColorSpace;
-    cloudMap.anisotropy = 4;
+    cloudMap.colorSpace = SRGBColorSpace;
+    cloudMap.anisotropy = 2;
   }, [cloudMap]);
   return <mesh rotation={[0, -Math.PI / 2, 0]}>
-    <sphereGeometry args={[1.012, 56, 56]} />
-    <meshPhongMaterial map={cloudMap} transparent opacity={0.28} depthWrite={false} blending={THREE.AdditiveBlending} />
+    <sphereGeometry args={[1.012, 44, 44]} />
+    <meshPhongMaterial map={cloudMap} transparent opacity={0.28} depthWrite={false} blending={AdditiveBlending} />
   </mesh>;
 }
 
 function Atmosphere() {
-  const material = useMemo(() => new THREE.ShaderMaterial({
+  const material = useMemo(() => new ShaderMaterial({
     vertexShader: atmosphereVertexShader,
     fragmentShader: atmosphereFragmentShader,
     transparent: true,
-    side: THREE.BackSide,
+    side: BackSide,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: AdditiveBlending,
   }), []);
   return <mesh material={material}>
-    <sphereGeometry args={[1.045, 56, 56]} />
+    <sphereGeometry args={[1.045, 44, 44]} />
   </mesh>;
 }
 
 function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Marker; active: boolean; transition: MarkerTransition; onSelect: (id: string) => void }) {
   const position = useMemo(() => toCartesian(marker.latitude, marker.longitude, 1.065), [marker.latitude, marker.longitude]);
-  const outgoingRing = useRef<THREE.Group>(null);
-  const incomingRing = useRef<THREE.Group>(null);
+  const outgoingRing = useRef<Group>(null);
+  const incomingRing = useRef<Group>(null);
   const isLeaving = transition.fromId === marker.id;
   const isEntering = transition.fromId !== null && transition.toId === marker.id;
 
@@ -127,27 +127,27 @@ function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Mar
   return <group position={position} onClick={event => { event.stopPropagation(); onSelect(marker.id); }}>
     {isLeaving && <group ref={outgoingRing}>
       <mesh>
-        <ringGeometry args={[0.07, 0.095, 32]} />
-        <meshBasicMaterial color="#ffb38d" transparent opacity={0.76} side={THREE.DoubleSide} />
+        <ringGeometry args={[0.07, 0.095, 20]} />
+        <meshBasicMaterial color="#ffb38d" transparent opacity={0.76} side={DoubleSide} />
       </mesh>
     </group>}
     {active && <group ref={incomingRing}>
       <mesh>
-        <ringGeometry args={[0.075, 0.09, 32]} />
-        <meshBasicMaterial color="#ffb38d" transparent opacity={0.85} side={THREE.DoubleSide} />
+        <ringGeometry args={[0.075, 0.09, 20]} />
+        <meshBasicMaterial color="#ffb38d" transparent opacity={0.85} side={DoubleSide} />
       </mesh>
     </group>}
     <mesh>
-      <sphereGeometry args={[active ? 0.045 : 0.032, 16, 16]} />
+      <sphereGeometry args={[active ? 0.045 : 0.032, 12, 12]} />
       <meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} />
     </mesh>
   </group>;
 }
 
 function GlobeScene({ markers, selectedId, markerTransition, onSelect, reducedMotion }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition }) {
-  const group = useRef<THREE.Group>(null);
+  const group = useRef<Group>(null);
   const selected = markers.find(marker => marker.id === selectedId);
-  const targetRotation = selected ? THREE.MathUtils.degToRad(-selected.longitude) : 0;
+  const targetRotation = selected ? MathUtils.degToRad(-selected.longitude) : 0;
   const transition = useRef({ from: 0, to: targetRotation, startedAt: 0 });
   const previousTarget = useRef(targetRotation);
   const invalidate = useThree(state => state.invalidate);
@@ -167,7 +167,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, reducedMo
     }
     const elapsed = Math.min(1, (performance.now() - transition.current.startedAt) / FOCUS_DURATION_MS);
     const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
-    group.current.rotation.y = THREE.MathUtils.lerp(transition.current.from, transition.current.to, eased);
+    group.current.rotation.y = MathUtils.lerp(transition.current.from, transition.current.to, eased);
     if (elapsed < 1) invalidate();
   });
 

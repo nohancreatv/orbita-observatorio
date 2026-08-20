@@ -3,6 +3,8 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { inferRouterOutputs } from "@trpc/server";
 import {
   ArrowUpRight,
+  Bell,
+  BellRing,
   Clock3,
   Crosshair,
   CloudSun,
@@ -23,6 +25,8 @@ import type { AppRouter } from "../../../server/routers";
 import { AdSlot } from "@/components/AdSlot";
 import { GlobeFallback } from "@/components/GlobeFallback";
 import { trpc } from "@/lib/trpc";
+import { useConsent } from "@/contexts/ConsentContext";
+import { createPassAlertKey, isFavorablePass, shouldSendPassAlert } from "@/lib/passAlerts";
 import "../multi-orbit.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -39,6 +43,7 @@ const OBJECT_IMAGES: Record<SatelliteId, string> = {
 };
 
 const EarthGlobe = lazy(() => import("@/components/EarthGlobe").then(module => ({ default: module.EarthGlobe })));
+const PASS_ALERT_STORAGE_KEY = "orbita-pass-alert-enabled";
 
 function formatNumber(value: number | null | undefined, maximumFractionDigits = 0) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
@@ -68,12 +73,21 @@ function getVisibilityCopy(visibility?: string) {
   return visibility || "aguardando sinal";
 }
 
+function PassAlertControl({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return <div className="passage-alert"><button type="button" className={enabled ? "pass-alert-button is-active" : "pass-alert-button"} onClick={onToggle} aria-pressed={enabled}>{enabled ? <BellRing size={16} aria-hidden="true" /> : <Bell size={16} aria-hidden="true" />}{enabled ? "alerta ativo nesta sessão" : "avisar quando estiver próximo"}</button><p>O aviso é exibido até 10 minutos antes da aproximação e funciona enquanto esta página estiver aberta.</p></div>;
+}
+
 export default function Home() {
+  const { clearPreferences } = useConsent();
   const [selectedSatellite, setSelectedSatellite] = useState<SatelliteId>("iss");
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Conectando à constelação orbital…");
   const [clock, setClock] = useState(() => new Date());
+  const [passAlertsEnabled, setPassAlertsEnabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [shouldLoadGlobe, setShouldLoadGlobe] = useState(false);
+  const [previewPassTimestamp] = useState(() => Math.floor(Date.now() / 1000) + 90);
 
   const catalogQuery = trpc.orbit.catalog.useQuery(undefined, { staleTime: 60 * 60_000 });
   const allSnapshotsQuery = trpc.orbit.allSnapshots.useQuery(undefined, { refetchInterval: 15_000, retry: 1 });
@@ -85,7 +99,10 @@ export default function Home() {
 
   const allSnapshots = allSnapshotsQuery.data || [];
   const snapshot = allSnapshots.find(item => item.satellite.id === selectedSatellite);
-  const prediction: PassPrediction | undefined = closestPass.data;
+  const previewPassAlert = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-alerta-passagem");
+  const livePrediction: PassPrediction | undefined = closestPass.data;
+  const prediction: PassPrediction | undefined = previewPassAlert ? { timestamp: previewPassTimestamp, distance: 300 } as PassPrediction : livePrediction;
+  const proximityState = Boolean(prediction && isFavorablePass(prediction.distance));
   const satellites = catalogQuery.data || [];
   const observingInput = useMemo(() => userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : { latitude: 0, longitude: 0 }, [userLocation]);
   const observingQuery = trpc.observation.conditions.useQuery(observingInput, { enabled: Boolean(userLocation), staleTime: 15 * 60_000, retry: 1 });
@@ -94,6 +111,16 @@ export default function Home() {
     const interval = window.setInterval(() => setClock(new Date()), 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!("Notification" in window)) return;
+    setNotificationPermission(Notification.permission);
+    setPassAlertsEnabled(sessionStorage.getItem(PASS_ALERT_STORAGE_KEY) === "true" && Notification.permission === "granted");
+  }, []);
+
+  useEffect(() => {
+    if (allSnapshots.length > 0) setShouldLoadGlobe(true);
+  }, [allSnapshots.length]);
 
   useEffect(() => {
     if (allSnapshotsQuery.isSuccess && allSnapshots.length) {
@@ -110,6 +137,15 @@ export default function Home() {
     // A previsão local depende da posição do visitante e é dedicada à ISS.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSatellite, userLocation]);
+
+  useEffect(() => {
+    if (!passAlertsEnabled || notificationPermission !== "granted" || !prediction || !userLocation || !proximityState) return;
+    const notificationKey = createPassAlertKey(prediction.timestamp, userLocation.latitude, userLocation.longitude);
+    if (!shouldSendPassAlert({ enabled: passAlertsEnabled, permission: notificationPermission, timestampSeconds: prediction.timestamp, distanceKm: prediction.distance, nowMs: clock.getTime(), alreadyAlerted: Boolean(sessionStorage.getItem(notificationKey)) })) return;
+    sessionStorage.setItem(notificationKey, "true");
+    const alert = new Notification("Órbita — passagem próxima", { body: `A ISS terá uma aproximação favorável ${formatTimeFromNow(prediction.timestamp)}. Confira as condições do seu horizonte.`, tag: notificationKey, icon: "/manus-storage/orbita-logo_99dcd0cb.png" });
+    alert.onclick = () => window.focus();
+  }, [clock, notificationPermission, passAlertsEnabled, prediction, proximityState, userLocation]);
 
   const requestLocation = () => {
     if (!navigator.geolocation) {
@@ -142,12 +178,32 @@ export default function Home() {
     );
   };
 
+  const togglePassAlert = async () => {
+    if (!userLocation) {
+      requestLocation();
+      return;
+    }
+    if (!("Notification" in window)) {
+      setStatusMessage("Este navegador não oferece alertas do sistema. A previsão continua visível nesta página.");
+      return;
+    }
+    const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    setNotificationPermission(permission);
+    if (permission !== "granted") {
+      setStatusMessage("Os alertas do navegador não foram autorizados. Você pode alterar essa escolha nas configurações do navegador.");
+      return;
+    }
+    const nextValue = !passAlertsEnabled;
+    sessionStorage.setItem(PASS_ALERT_STORAGE_KEY, String(nextValue));
+    setPassAlertsEnabled(nextValue);
+    setStatusMessage(nextValue ? "Alerta ativado para a próxima aproximação favorável enquanto esta página estiver aberta." : "Alerta de passagem desativado para esta sessão.");
+  };
+
   const selectedShortName = snapshot?.satellite.shortName || "satélite";
   const selectedName = snapshot?.satellite.name || "objeto orbital";
   const selectedImage = OBJECT_IMAGES[selectedSatellite];
   const groundPortraitUrl = snapshot ? `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude}`)}&zoom=4&size=520x320&maptype=mapnik&markers=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude},orange-pushpin`)}` : "/manus-storage/iss-map-texture_2bd39705.png";
   const currentTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(clock);
-  const proximityState = prediction && prediction.distance < 2500;
   const previewStoryFailure = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-falha-nasa");
   const storyFailed = storyQuery.isError || previewStoryFailure;
   const storyLoading = storyQuery.isLoading && !storyFailed;
@@ -188,7 +244,7 @@ export default function Home() {
         <div className="orbital-stage multi-orbit-stage" aria-label={`Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais`}>
           <img src="/manus-storage/iss-hero-earth_dc590d13.png" alt="Terra vista do espaço" className="hero-earth-art" decoding="async" fetchPriority="high" />
           <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
-          <Suspense fallback={<GlobeFallback />}><EarthGlobe markers={globeMarkers} selectedId={selectedSatellite} onSelect={id => setSelectedSatellite(id as SatelliteId)} className="three-globe-interactive" /></Suspense>
+          {shouldLoadGlobe ? <Suspense fallback={<GlobeFallback />}><EarthGlobe markers={globeMarkers} selectedId={selectedSatellite} onSelect={id => setSelectedSatellite(id as SatelliteId)} className="three-globe-interactive" /></Suspense> : <GlobeFallback />}
           <div className="globe-badge globe-badge-wide"><div className="badge-icon"><Crosshair size={17} aria-hidden="true" /></div><div><span>{selectedShortName} agora</span><strong>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "sincronizando coordenadas"}</strong><small><MapPin size={11} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização terrestre em leitura"}</small></div></div>
           <div className="orbit-caption orbit-caption-bottom"><span /> foco: {selectedShortName}</div>
         </div>
@@ -210,7 +266,7 @@ export default function Home() {
 
       <section className="ground-location-section" aria-labelledby="ground-title"><div className="ground-location-title"><p className="eyebrow"><MapPin size={15} aria-hidden="true" /> Da coordenada ao território</p><h2 id="ground-title">Onde está <em>{selectedShortName}</em> neste instante?</h2></div><div className="ground-location-card"><span className="location-label">ponto suborbital aproximado</span><strong>{snapshot?.groundLocation.label || "identificando cidade e país…"}</strong><div className="location-coordinates">{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</div><p>{snapshot?.groundLocation.isOceanOrRemote ? "Este ponto pode estar sobre oceano, áreas remotas ou uma região onde uma cidade não foi identificada." : "A localização indica o ponto da superfície terrestre mais diretamente abaixo do satélite; não representa uma rota de sobrevoo visível."}</p></div><a href="#fontes" className="source-link ground-source-link">como lemos o ponto terrestre <ArrowUpRight size={16} aria-hidden="true" /></a></section>
 
-      <section className="passage-section" aria-labelledby="passage-title"><div className="passage-art" aria-hidden="true"><img src="/manus-storage/iss-passage-panel_d049613e.png" alt="" loading="lazy" decoding="async" /><div className="art-annotation annotation-one">linha de passagem</div><div className="art-annotation annotation-two">horizonte local</div></div><div className="passage-copy"><p className="eyebrow"><Sparkles size={15} aria-hidden="true" /> O seu horizonte</p><h2 id="passage-title">A próxima chance de ver a ISS começa pela sua cidade.</h2>{userLocation ? <div className="passage-result"><div className="location-line"><MapPin size={18} aria-hidden="true" /><span>{userLocation.label}</span></div>{selectedSatellite !== "iss" ? <p className="result-detail">A previsão local de passagem é calculada para a ISS. Selecione-a na constelação para consultar o seu horizonte.</p> : prediction ? <><p className={proximityState ? "result-status is-good" : "result-status"}>{proximityState ? "Boa aproximação prevista" : "Passagem mais próxima no período"}</p><strong className="passage-time">{formatTimeFromNow(prediction.timestamp)}</strong><p className="result-detail">A ISS deve passar a cerca de {formatNumber(prediction.distance)} km da sua posição, por volta de {formatDate(prediction.timestamp)}.</p></> : <p className="result-detail">Estamos consultando a rota das próximas duas horas.</p>}</div> : <div className="passage-empty"><p>Conte onde você está e calcularemos a aproximação mais promissora da ISS nas próximas duas horas.</p><button type="button" className="text-button" onClick={requestLocation}>definir meu horizonte <ArrowUpRight size={16} aria-hidden="true" /></button></div>}<p className="visibility-caveat">A observação a olho nu depende também da iluminação solar, da elevação e das condições de nuvens.</p></div></section>
+      <section className="passage-section" aria-labelledby="passage-title"><div className="passage-art" aria-hidden="true"><img src="/manus-storage/iss-passage-panel_d049613e.png" alt="" loading="lazy" decoding="async" /><div className="art-annotation annotation-one">linha de passagem</div><div className="art-annotation annotation-two">horizonte local</div></div><div className="passage-copy"><p className="eyebrow"><Sparkles size={15} aria-hidden="true" /> O seu horizonte</p><h2 id="passage-title">A próxima chance de ver a ISS começa pela sua cidade.</h2>{userLocation ? <div className="passage-result"><div className="location-line"><MapPin size={18} aria-hidden="true" /><span>{userLocation.label}</span></div>{selectedSatellite !== "iss" ? <p className="result-detail">A previsão local de passagem é calculada para a ISS. Selecione-a na constelação para consultar o seu horizonte.</p> : prediction ? <><p className={proximityState ? "result-status is-good" : "result-status"}>{proximityState ? "Boa aproximação prevista" : "Passagem mais próxima no período"}</p><strong className="passage-time">{formatTimeFromNow(prediction.timestamp)}</strong><p className="result-detail">A ISS deve passar a cerca de {formatNumber(prediction.distance)} km da sua posição, por volta de {formatDate(prediction.timestamp)}.</p>{proximityState && <PassAlertControl enabled={passAlertsEnabled} onToggle={togglePassAlert} />}</> : <p className="result-detail">Estamos consultando a rota das próximas duas horas.</p>}</div> : <div className="passage-empty"><p>Conte onde você está e calcularemos a aproximação mais promissora da ISS nas próximas duas horas.</p><button type="button" className="text-button" onClick={requestLocation}>definir meu horizonte <ArrowUpRight size={16} aria-hidden="true" /></button></div>}<p className="visibility-caveat">A observação a olho nu depende também da iluminação solar, da elevação e das condições de nuvens.</p></div></section>
 
       <section className="sky-conditions-section" aria-labelledby="sky-title">
         <div className="sky-conditions-heading"><p className="eyebrow"><CloudSun size={15} aria-hidden="true" /> Janela de observação</p><h2 id="sky-title">O céu do seu horizonte.</h2><p>Depois de autorizar a localização, estimamos as condições que ajudam a planejar uma observação a olho nu.</p></div>
@@ -225,7 +281,7 @@ export default function Home() {
 
       <AdSlot placement="feed-mobile" />
       <section id="fontes" className="context-section" aria-label="Fontes e limites do observatório"><div className="context-image"><img src="/manus-storage/iss-map-texture_2bd39705.png" alt="Textura cartográfica da Terra vista da órbita" loading="lazy" decoding="async" /></div><div className="context-copy"><span className="section-index">01 — LEITURA DO CÉU</span><p>Dados de posição vêm de fontes públicas especializadas. Cidade e país indicam o subponto aproximado da órbita, e não uma confirmação de visibilidade local.</p></div><a href="/fontes" className="source-link">fontes, limites e privacidade <ArrowUpRight size={16} aria-hidden="true" /></a></section>
-      <footer className="site-footer"><span>Órbita — um pequeno observatório para grandes distâncias.</span><div className="footer-links"><a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/fontes">fontes</a></div><span>{allSnapshots.length} objetos · foco: {selectedShortName}</span></footer>
+      <footer className="site-footer"><span>Órbita — um pequeno observatório para grandes distâncias.</span><div className="footer-links"><a href="/privacidade">privacidade</a><button type="button" onClick={clearPreferences}>cookies</button><a href="/termos">termos</a><a href="/fontes">fontes</a></div><span>{allSnapshots.length} objetos · foco: {selectedShortName}</span></footer>
       </div>
       <aside className="ad-rail ad-rail--left"><div className="ad-rail__inner"><AdSlot placement="sidebar-left" /></div></aside>
       <aside className="ad-rail ad-rail--right"><div className="ad-rail__inner"><AdSlot placement="sidebar-right" /></div></aside>

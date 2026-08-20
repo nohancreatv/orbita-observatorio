@@ -13,6 +13,8 @@ describe("cabeçalhos HTTP de produção", () => {
     expect(headers.get("Content-Security-Policy")).toContain("default-src 'self'");
     expect(headers.get("Content-Security-Policy")).toContain("object-src 'none'");
     expect(headers.get("Content-Security-Policy")).toContain("https://staticmap.openstreetmap.de");
+    expect(headers.get("Content-Security-Policy")).toContain("https://pagead2.googlesyndication.com");
+    expect(headers.get("Content-Security-Policy")).toContain("frame-src https://*.googlesyndication.com");
     expect(headers.get("Permissions-Policy")).toContain("geolocation=(self)");
     expect(headers.get("X-Frame-Options")).toBe("DENY");
     expect(headers.get("Strict-Transport-Security")).toContain("max-age=31536000");

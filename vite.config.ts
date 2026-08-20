@@ -167,6 +167,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three/fiber")) return "three-runtime";
+        if (id.includes("node_modules/react") || id.includes("node_modules/scheduler")) return "react-runtime";
+      },
+    },
+    },
   },
   server: {
     host: true,

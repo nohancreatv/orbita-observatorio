@@ -10,11 +10,12 @@ export const productionSecurityHeaders: RequestHandler = (req, res, next) => {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    "script-src 'self' https://*.manus.computer https://*.manus.space",
+    "script-src 'self' https://*.manus.computer https://*.manus.space https://pagead2.googlesyndication.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://*.nasa.gov https://staticmap.openstreetmap.de",
-    "connect-src 'self'",
+    "img-src 'self' data: https://*.nasa.gov https://staticmap.openstreetmap.de https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
+    "connect-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
+    "frame-src https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
     "upgrade-insecure-requests",
   ].join("; ");
 

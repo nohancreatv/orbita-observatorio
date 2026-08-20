@@ -11,7 +11,7 @@ describe("foco do globo multiobjetos", () => {
   });
 
   it("produz uma rotação distinta para cada longitude de foco", () => {
-    expect(focusRotation(-41.2)).toBe("41.19999999999999deg");
+    expect(focusRotation(-41.2)).toBe("41.2deg");
     expect(focusRotation(-41.2)).not.toBe(focusRotation(106.6));
   });
 });

@@ -21,7 +21,7 @@ export function projectOnGlobe(latitude: number, longitude: number, centralLongi
 }
 
 export function focusRotation(longitude: number) {
-  return `${normaliseLongitude(-longitude)}deg`;
+  return `${Math.round(normaliseLongitude(-longitude) * 1_000_000) / 1_000_000}deg`;
 }
 
 export function markerClassName(markerId: string, selectedId: string) {

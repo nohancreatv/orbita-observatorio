@@ -79,3 +79,16 @@
 - [x] Adicionar placeholders de altura fixa para telemetria, agenda de lançamentos e curiosidade NASA durante o carregamento assíncrono.
 - [x] Revisar a divisão do bundle do globo e registrar o impacto do carregamento diferido no artefato de produção.
 - [x] Criar uma regressão automatizada para as trilhas publicitárias desktop, o slot móvel e requisitos básicos de acessibilidade.
+- [x] Corrigir o recorte do cartão de telemetria em larguras estreitas e identificar regressões visuais relacionadas.
+- [x] Implementar banner de consentimento de cookies com preferências persistidas e controle de publicidade.
+- [x] Configurar o carregamento condicionado do Google Ads com o Publisher ID fornecido pelo proprietário.
+- [x] Projetar alertas opcionais de próximas passagens visíveis com permissões claras e gerenciamento pelo usuário.
+- [x] Implementar alertas em sessão no navegador, conforme a modalidade escolhida, sem adicionar temporizadores de segundo plano.
+- [x] Reduzir ou adiar mais o custo do pacote Three.js sem degradar o globo interativo.
+- [x] Validar o consentimento, os alertas, o layout responsivo e o desempenho do globo após as mudanças.
+- [x] Preparar e entregar o changelog técnico da segunda rodada.
+- [x] Implementar alertas opt-in no navegador enquanto o observatório estiver aberto, conforme a modalidade escolhida pelo usuário.
+- [x] Configurar IDs de unidade do AdSense para os três inventários manuais ou registrar a operação exclusiva por Auto Ads.
+- [x] Adicionar validação ponta a ponta da solicitação de permissão, ativação e prevenção de duplicidade dos alertas do navegador.
+- [x] Medir e registrar o impacto da divisão do bundle no carregamento inicial e no runtime 3D diferido.
+- [x] Documentar o modo Auto Ads-only e validar automaticamente que os inventários manuais não são solicitados sem IDs de unidade.

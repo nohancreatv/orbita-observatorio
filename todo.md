@@ -129,3 +129,8 @@
 - [x] Remover runtime inline de desenvolvimento do build publicado e restringir a política de scripts à origem própria e ao AdSense autorizado.
 - [x] Forçar o atributo Secure de cookies de sessão em produção, independentemente de cabeçalhos intermediários de proxy.
 - [x] Minimizar dados de identidade: deixar de persistir e expor e-mail OAuth, que não é utilizado pelo observatório público.
+- [x] Identificar a fonte externa que retorna 429 e reproduzir a sequência de chamadas que provoca o limite.
+- [x] Adicionar cache compartilhado, deduplicação e backoff para dados orbitais ou espaciais sujeitos a rate limit externo.
+- [x] Converter respostas 429 externas em dados recentes preservados ou estado de contingência não disruptivo.
+- [x] Cobrir 429 externo com teste de regressão e validar a página sem erro de consulta visível.
+- [x] Publicar o diagnóstico e a correção do limite de taxa externo.

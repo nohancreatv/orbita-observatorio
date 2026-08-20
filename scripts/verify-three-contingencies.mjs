@@ -23,6 +23,12 @@ try {
   await nasa.waitForFunction(() => document.body.textContent?.includes('A janela do cosmos está temporariamente fechada.'), undefined, { timeout: 15_000 });
   checks.push('NASA');
 
+  const nasaEmpty = await browser.newPage();
+  await nasaEmpty.goto(`${baseUrl}?simular-nasa-vazia`, { waitUntil: 'domcontentloaded' });
+  await verifyCanvas(nasaEmpty, 'NASA sem conteúdo');
+  await nasaEmpty.waitForFunction(() => document.body.textContent?.includes('A janela do cosmos está temporariamente fechada.'), undefined, { timeout: 15_000 });
+  checks.push('NASA sem conteúdo');
+
   const denied = await browser.newPage();
   await denied.addInitScript(() => {
     navigator.geolocation.getCurrentPosition = (_success, error) => error?.({ code: 1, message: 'denied' });

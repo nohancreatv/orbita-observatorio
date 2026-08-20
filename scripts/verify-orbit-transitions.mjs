@@ -20,6 +20,10 @@ try {
   for (const target of sequence) {
     const beforeLongitude = await page.locator(".three-globe").getAttribute("data-focus-longitude");
     await page.getByRole("button", { name: target.button, exact: true }).click();
+    // A troca de estado pai é síncrona, mas o efeito que abre a janela visual de
+    // 500 ms é aplicado após o commit React. Esperar um frame estável evita que a
+    // sondagem por RAF perca essa janela em WebGL headless sob carga.
+    await page.waitForTimeout(100);
     await page.waitForFunction(({ from, to }) => {
       const globe = document.querySelector(".three-globe");
       return globe?.getAttribute("data-transition-from") === from && globe?.getAttribute("data-transition-to") === to && globe?.getAttribute("data-is-transitioning") === "true" && globe?.getAttribute("data-active-marker") === to;

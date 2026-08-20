@@ -161,3 +161,4 @@
 - [ ] Remover a dependência da variável de repositório bloqueada pela permissão GitHub, mantendo o identificador público do site no workflow.
 - [ ] Preservar o Publisher ID público do AdSense no build automatizado para evitar regressão de monetização no deploy por Actions.
 - [ ] Corrigir o conflito entre a versão do pnpm declarada no projeto e a configuração do GitHub Actions.
+- [ ] Corrigir a falha dos testes Vitest no runner GitHub Actions sem reduzir a cobertura de regressão.

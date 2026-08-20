@@ -17,6 +17,9 @@ jobs:
   validate:
     name: Validar aplicação
     runs-on: ubuntu-latest
+    env:
+      NASA_API_KEY: ci-test-key-not-for-api
+      VITE_ADSENSE_PUBLISHER_ID: ca-pub-5884730150482896
     steps:
       - name: Obter código
         uses: actions/checkout@v4
@@ -41,8 +44,6 @@ jobs:
 
       - name: Validar build e função Netlify
         run: pnpm exec netlify build --offline
-        env:
-          VITE_ADSENSE_PUBLISHER_ID: ca-pub-5884730150482896
 
   deploy:
     name: Publicar produção

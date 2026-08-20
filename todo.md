@@ -160,3 +160,4 @@
 - [ ] Validar e publicar a automação e a documentação no repositório GitHub privado.
 - [ ] Remover a dependência da variável de repositório bloqueada pela permissão GitHub, mantendo o identificador público do site no workflow.
 - [ ] Preservar o Publisher ID público do AdSense no build automatizado para evitar regressão de monetização no deploy por Actions.
+- [ ] Corrigir o conflito entre a versão do pnpm declarada no projeto e a configuração do GitHub Actions.

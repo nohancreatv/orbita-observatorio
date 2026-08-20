@@ -20,8 +20,8 @@ import {
   Telescope,
 } from "lucide-react";
 import type { AppRouter } from "../../../server/routers";
+import { EarthGlobe } from "@/components/EarthGlobe";
 import { trpc } from "@/lib/trpc";
-import { focusRotation, markerClassName, normaliseLongitude, projectOnGlobe } from "@/lib/orbitVisual";
 import "../multi-orbit.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -78,6 +78,7 @@ export default function Home() {
   const launchesQuery = trpc.space.launches.useQuery(undefined, { staleTime: 20 * 60_000, retry: 1 });
   const userPlace = trpc.orbit.userPlace.useMutation();
   const closestPass = trpc.orbit.issClosestPass.useMutation();
+  const previewTelemetryFailure = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-falha-telemetria");
 
   const allSnapshots = allSnapshotsQuery.data || [];
   const snapshot = allSnapshots.find(item => item.satellite.id === selectedSatellite);
@@ -96,8 +97,8 @@ export default function Home() {
       const instant = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
       setStatusMessage(`${allSnapshots.length} objetos orbitais sincronizados às ${instant}.`);
     }
-    if (allSnapshotsQuery.isError) setStatusMessage("O rastreador está indisponível agora. Tente atualizar em instantes.");
-  }, [allSnapshots.length, allSnapshotsQuery.isError, allSnapshotsQuery.isSuccess]);
+    if (allSnapshotsQuery.isError || previewTelemetryFailure) setStatusMessage("O rastreador está indisponível agora. Tente atualizar em instantes.");
+  }, [allSnapshots.length, allSnapshotsQuery.isError, allSnapshotsQuery.isSuccess, previewTelemetryFailure]);
 
   useEffect(() => {
     if (selectedSatellite === "iss" && userLocation) {
@@ -140,8 +141,6 @@ export default function Home() {
 
   const selectedShortName = snapshot?.satellite.shortName || "satélite";
   const selectedName = snapshot?.satellite.name || "objeto orbital";
-  const centerLongitude = snapshot?.longitude || 0;
-  const centerLatitude = snapshot?.latitude || 0;
   const selectedImage = OBJECT_IMAGES[selectedSatellite];
   const groundPortraitUrl = snapshot ? `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude}`)}&zoom=4&size=520x320&maptype=mapnik&markers=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude},orange-pushpin`)}` : "/manus-storage/iss-map-texture_2bd39705.png";
   const currentTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(clock);
@@ -153,8 +152,7 @@ export default function Home() {
   const observingConditions = observingQuery.data;
   const skyReadout = observingConditions?.cloudCover === null || observingConditions?.cloudCover === undefined ? "céu em leitura" : observingConditions.cloudCover < 25 ? "céu favorável" : observingConditions.cloudCover < 60 ? "nuvens variáveis" : "céu encoberto";
   const launchDate = (value: string | null | undefined) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "horário a confirmar";
-  const selectedProjection = snapshot ? projectOnGlobe(snapshot.latitude, snapshot.longitude, centerLongitude) : null;
-  const globeStyle = { "--globe-rotation": focusRotation(centerLongitude), "--focus-latitude": `${centerLatitude}` } as React.CSSProperties;
+  const globeMarkers = useMemo(() => allSnapshots.map(item => ({ id: item.satellite.id, shortName: item.satellite.shortName, name: item.satellite.name, latitude: item.latitude, longitude: item.longitude })), [allSnapshots]);
 
   return (
     <main className="observatory-shell">
@@ -182,26 +180,7 @@ export default function Home() {
         <div className="orbital-stage multi-orbit-stage" aria-label={`Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais`}>
           <img src="/manus-storage/iss-hero-earth_dc590d13.png" alt="Terra vista do espaço" className="hero-earth-art" />
           <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
-          <div className="globe-frame globe-frame-interactive" style={globeStyle}>
-            <div className="globe-ocean" aria-hidden="true" />
-            <div className="globe-map-overlay" aria-hidden="true" />
-            <div className="globe-relief" aria-hidden="true" />
-            <div className="globe-clouds globe-clouds-one" aria-hidden="true" />
-            <div className="globe-clouds globe-clouds-two" aria-hidden="true" />
-            <div className="globe-grid globe-grid-longitude" aria-hidden="true" />
-            <div className="globe-grid globe-grid-latitude" aria-hidden="true" />
-            <div className="globe-terminator" aria-hidden="true" />
-            <div className="globe-equator" aria-hidden="true" />
-            <div className="orbital-path orbital-path-one" aria-hidden="true" />
-            <div className="orbital-path orbital-path-two" aria-hidden="true" />
-            {allSnapshots.map(item => {
-              const point = projectOnGlobe(item.latitude, item.longitude, centerLongitude);
-              const active = item.satellite.id === selectedSatellite;
-              return <button key={item.satellite.id} type="button" onClick={() => setSelectedSatellite(item.satellite.id as SatelliteId)} className={markerClassName(item.satellite.id, selectedSatellite)} style={{ left: point.left, top: point.top, opacity: point.opacity, transform: `translate(-50%, -50%) scale(${point.scale})` }} aria-label={`Focar ${item.satellite.name}`} aria-pressed={active}><span className="marker-halo" /><Satellite size={active ? 16 : 12} strokeWidth={active ? 2.5 : 2} /><span className="marker-label">{item.satellite.shortName}</span></button>;
-            })}
-            {selectedProjection && <div className="focus-reticle" style={{ left: selectedProjection.left, top: selectedProjection.top }} aria-hidden="true"><span /><span /></div>}
-            <div className="globe-scale-label globe-scale-north">90° N</div><div className="globe-scale-label globe-scale-equator">equador</div><div className="globe-scale-label globe-scale-south">90° S</div>
-          </div>
+          <EarthGlobe markers={globeMarkers} selectedId={selectedSatellite} onSelect={id => setSelectedSatellite(id as SatelliteId)} className="three-globe-interactive" />
           <div className="globe-badge globe-badge-wide"><div className="badge-icon"><Crosshair size={17} aria-hidden="true" /></div><div><span>{selectedShortName} agora</span><strong>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "sincronizando coordenadas"}</strong><small><MapPin size={11} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização terrestre em leitura"}</small></div></div>
           <div className="orbit-caption orbit-caption-bottom"><span /> foco: {selectedShortName}</div>
         </div>

@@ -38,3 +38,13 @@
 - [x] Registrar uma evidência final única que cubra o globo 3D em desktop e celular.
 - [x] Validar em celular a troca de foco com rotação de 0,5 segundo e painel geográfico legível.
 - [x] Consolidar em um único registro os artefatos de validação desktop e celular do globo 3D.
+- [x] Definir o componente React Three Fiber, os limites de qualidade e a estratégia de redução de movimento.
+- [x] Adicionar three, @types/three, @react-three/fiber e @react-three/drei ao projeto.
+- [x] Preparar mapas de superfície diurna, noturna e nuvens em formato adequado para uso web.
+- [x] Implementar globo 3D memoizado, atmosfera Fresnel e iluminação editorial Midnight Blue.
+- [x] Projetar a posição geodésica da ISS em um marcador preciso sobre a esfera 3D.
+- [x] Integrar o foco de satélite existente ao globo 3D e preservar os estados de contingência.
+- [x] Validar desempenho, redução de movimento, responsividade e dados orbitais no novo renderizador.
+- [x] Revalidar os estados de contingência de telemetria, geolocalização, geocodificação e NASA com o globo 3D ativo.
+- [x] Executar uma verificação objetiva de desempenho do globo 3D e registrar as métricas de renderização em desktop e celular.
+- [x] Registrar em arquivo de validação as métricas de renderização desktop e celular do globo 3D, incluindo canvas e marcadores.

@@ -25,6 +25,12 @@ O refinamento 3D foi validado no navegador automatizado: a troca de foco do Hubb
 
 A captura móvel posterior ao refinamento confirmou a leitura do globo com continentes, nuvens, foco laranja, cartão do objeto e retrato suborbital sem quebra de hierarquia ou sobreposição crítica.
 
+## Renderizador 3D React Three Fiber
+
+O globo CSS foi substituído por um canvas React Three Fiber com textura diurna, emissivo noturno, camada de nuvens, atmosfera Fresnel e quatro marcadores geodésicos. A validação E2E desktop e móvel confirmou a seleção da ISS/Hubble, atualização do foco, telemetria e local suborbital. A preferência `prefers-reduced-motion` foi exercitada e reduz o canvas a renderização sob demanda.
+
+Os quatro estados de contingência foram revalidados com o canvas ativo: telemetria indisponível, NASA APOD indisponível, geolocalização negada e geocodificação indisponível. A medição sustentada após aquecimento de texturas registrou 41,49 ms médios / 63,2 ms p95 no viewport desktop e 21,46 ms médios / 41,9 ms p95 no móvel, cada um com um único canvas e quatro marcadores.
+
 ## Validação consolidada do globo 3D
 
 | Viewport | Interação validada | Evidência |

@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { Settings2, ShieldCheck } from "lucide-react";
 import { useConsent } from "@/contexts/ConsentContext";
+import { useLocation } from "wouter";
 
 export function CookieConsentBanner() {
   const { isReady, preferences, savePreferences } = useConsent();
+  const [location] = useLocation();
   const [showDetails, setShowDetails] = useState(false);
   const [advertising, setAdvertising] = useState(false);
-  if (!isReady || preferences) return null;
+  const isKnownContentRoute = ["/", "/privacidade", "/termos", "/fontes"].includes(location);
+  const isDevelopmentRecovery = import.meta.env.DEV && new URLSearchParams(window.location.search).has("force-error-boundary");
+  if (!isReady || preferences || !isKnownContentRoute || isDevelopmentRecovery) return null;
 
   return <aside className="cookie-consent" role="dialog" aria-modal="false" aria-labelledby="cookie-consent-title" aria-describedby="cookie-consent-copy">
     <div className="cookie-consent__icon"><ShieldCheck size={19} aria-hidden="true" /></div>

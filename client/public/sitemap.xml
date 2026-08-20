@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>
-  <url><loc>/privacidade</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
-  <url><loc>/termos</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
-  <url><loc>/fontes</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://isswatcher-8zu9asw5.manus.space/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://isswatcher-8zu9asw5.manus.space/privacidade</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://isswatcher-8zu9asw5.manus.space/termos</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://isswatcher-8zu9asw5.manus.space/fontes</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>
 </urlset>

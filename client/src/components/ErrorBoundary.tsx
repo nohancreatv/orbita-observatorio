@@ -21,37 +21,33 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error) {
+    console.error("[Órbita] Falha de renderização recuperada", error);
+  }
+
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
+        <main className="flex items-center justify-center min-h-screen p-8 bg-background" role="alert">
+          <div className="flex flex-col items-center w-full max-w-xl p-8 text-center">
             <AlertTriangle
               size={48}
               className="text-destructive mb-6 flex-shrink-0"
             />
 
-            <h2 className="text-xl mb-4">An unexpected error occurred.</h2>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
-              </pre>
-            </div>
+            <p className="eyebrow mb-3">Sinal interrompido</p>
+            <h1 className="font-serif text-4xl text-foreground mb-4">O observatório encontrou uma interferência.</h1>
+            <p className="max-w-md text-sm leading-6 text-muted-foreground mb-6">Seus dados não foram alterados. Recarregue a página para retomar a leitura orbital.</p>
 
             <button
               onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg",
-                "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
-              )}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"
             >
               <RotateCcw size={16} />
-              Reload Page
+              recarregar observatório
             </button>
           </div>
-        </div>
+        </main>
       );
     }
 

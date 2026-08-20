@@ -92,3 +92,22 @@
 - [x] Adicionar validação ponta a ponta da solicitação de permissão, ativação e prevenção de duplicidade dos alertas do navegador.
 - [x] Medir e registrar o impacto da divisão do bundle no carregamento inicial e no runtime 3D diferido.
 - [x] Documentar o modo Auto Ads-only e validar automaticamente que os inventários manuais não são solicitados sem IDs de unidade.
+- [x] Executar varredura de estabilidade: compilação, logs, links, erros silenciosos e fluxos de falha.
+- [x] Auditar segurança: segredos, entradas, CSP, rotas públicas e superfícies de XSS.
+- [x] Verificar SEO, semântica, metadados, atributos alternativos e acessibilidade essencial.
+- [x] Corrigir autonomamente achados de auditoria sem regredir funcionalidades orbitais, consentimento ou alertas.
+- [x] Executar regressão final e emitir parecer técnico Go/No-Go de produção.
+- [x] Remover exposição de stacktrace do limite global de erro e alinhar a recuperação ao idioma e identidade do produto.
+- [x] Completar metadados SEO e sociais, incluindo canonical, OpenGraph e Twitter Cards.
+- [x] Corrigir sitemap para URLs canônicas absolutas e completar o manifesto web público.
+- [x] Alinhar a rota 404 ao idioma, semântica e navegação do observatório.
+- [x] Adicionar regressão de prontidão para rotas, metadados, sitemap, manifesto e recuperação global de erro.
+- [x] Remover atributos e caminhos locais de depuração dos artefatos JavaScript de produção.
+- [x] Forçar modo de produção no script de build para remover transformação JSX de desenvolvimento e referências locais remanescentes.
+- [x] Remover arquivos estáticos do coletor de depuração que ainda são copiados para o diretório público de produção.
+- [x] Encerrar explicitamente o processo quando a inicialização do servidor falhar, evitando serviço parcialmente indisponível.
+- [x] Restaurar compatibilidade entre a configuração do Vite e a ponte de desenvolvimento para eliminar a tela em branco detectada na auditoria.
+- [x] Evitar que o banner de consentimento obstrua a rota 404 ou a recuperação global de erro.
+- [x] Renderizar metadados SEO e OpenGraph por rota também no HTML entregue pelo servidor, para rastreadores sem JavaScript.
+- [x] Remover analytics externo incondicional bloqueado pela CSP para alinhar privacidade, consentimento e segurança de conteúdo.
+- [x] Entregar status HTTP 404 real para rotas inexistentes, mantendo a página de recuperação e os metadados noindex.

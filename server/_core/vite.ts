@@ -6,6 +6,58 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
+const SITE_ORIGIN = "https://isswatcher-8zu9asw5.manus.space";
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/manus-storage/orbita-logo_99dcd0cb.png`;
+
+type SeoMetadata = { title: string; description: string; path: string; noIndex?: boolean };
+
+const seoRoutes: Record<string, SeoMetadata> = {
+  "/": { title: "Órbita — ISS acima de você", description: "Acompanhe a posição da Estação Espacial Internacional e descubra sua próxima aproximação.", path: "/" },
+  "/privacidade": { title: "Privacidade — Órbita", description: "Como o observatório Órbita trata localização, publicidade e preferências de privacidade.", path: "/privacidade" },
+  "/termos": { title: "Termos de uso — Órbita", description: "Termos e limites de uso do observatório orbital Órbita.", path: "/termos" },
+  "/fontes": { title: "Fontes e limites — Órbita", description: "Fontes públicas e limites dos dados orbitais apresentados pelo Órbita.", path: "/fontes" },
+};
+
+function responseStatus(pathname: string) {
+  return seoRoutes[pathname] ? 200 : 404;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] || character);
+}
+
+function routeSeo(pathname: string): SeoMetadata {
+  return seoRoutes[pathname] || { title: "Página não encontrada — Órbita", description: "A rota solicitada não existe no observatório Órbita.", path: "/404", noIndex: true };
+}
+
+function seoMarkup(metadata: SeoMetadata) {
+  const title = escapeHtml(metadata.title);
+  const description = escapeHtml(metadata.description);
+  const canonical = `${SITE_ORIGIN}${metadata.path}`;
+  const robots = metadata.noIndex ? "noindex, nofollow" : "index, follow";
+  return `<!-- route-seo:start -->
+    <meta name="robots" content="${robots}" />
+    <meta name="description" content="${description}" />
+    <link rel="canonical" href="${canonical}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:site_name" content="Órbita" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${canonical}" />
+    <meta property="og:image" content="${DEFAULT_IMAGE}" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:image" content="${DEFAULT_IMAGE}" />
+    <title>${title}</title>
+    <!-- route-seo:end -->`;
+}
+
+function injectRouteSeo(template: string, pathname: string) {
+  return template.replace(/<!-- route-seo:start -->[\s\S]*?<!-- route-seo:end -->/, seoMarkup(routeSeo(pathname)));
+}
+
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
@@ -34,12 +86,13 @@ export async function setupVite(app: Express, server: Server) {
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
+      template = injectRouteSeo(template, new URL(url, "http://localhost").pathname).replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      const pathname = new URL(url, "http://localhost").pathname;
+      res.status(responseStatus(pathname)).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -60,8 +113,14 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // Fall through to index.html if the file does not exist, preserving route-specific SEO for crawlers.
+  app.use("*", async (req, res, next) => {
+    try {
+      const template = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
+      const pathname = new URL(req.originalUrl, "http://localhost").pathname;
+      res.status(responseStatus(pathname)).set({ "Content-Type": "text/html" }).send(injectRouteSeo(template, pathname));
+    } catch (error) {
+      next(error);
+    }
   });
 }

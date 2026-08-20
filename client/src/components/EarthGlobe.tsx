@@ -30,6 +30,7 @@ const atmosphereFragmentShader = `
 `;
 
 type Marker = { id: string; shortName: string; name: string; latitude: number; longitude: number };
+type MarkerTransition = { fromId: string | null; toId: string; startedAt: number };
 
 export type EarthGlobeProps = {
   markers: Marker[];
@@ -110,13 +111,33 @@ function Atmosphere() {
   </mesh>;
 }
 
-function SatelliteMarker({ marker, active, onSelect }: { marker: Marker; active: boolean; onSelect: (id: string) => void }) {
+function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Marker; active: boolean; transition: MarkerTransition; onSelect: (id: string) => void }) {
   const position = useMemo(() => toCartesian(marker.latitude, marker.longitude, 1.065), [marker.latitude, marker.longitude]);
+  const outgoingRing = useRef<THREE.Group>(null);
+  const incomingRing = useRef<THREE.Group>(null);
+  const isLeaving = transition.fromId === marker.id;
+  const isEntering = transition.fromId !== null && transition.toId === marker.id;
+
+  useFrame(() => {
+    if (!isLeaving && !isEntering) return;
+    const progress = Math.min(1, (performance.now() - transition.startedAt) / FOCUS_DURATION_MS);
+    if (isLeaving && outgoingRing.current) outgoingRing.current.scale.setScalar(Math.max(.01, 1 - progress));
+    if (isEntering && incomingRing.current) incomingRing.current.scale.setScalar(.6 + progress * .4);
+  });
+
   return <group position={position} onClick={event => { event.stopPropagation(); onSelect(marker.id); }}>
-    {active && <mesh>
-      <ringGeometry args={[0.075, 0.09, 32]} />
-      <meshBasicMaterial color="#ffb38d" transparent opacity={0.85} side={THREE.DoubleSide} />
-    </mesh>}
+    {isLeaving && <group ref={outgoingRing}>
+      <mesh>
+        <ringGeometry args={[0.07, 0.095, 32]} />
+        <meshBasicMaterial color="#ffb38d" transparent opacity={0.76} side={THREE.DoubleSide} />
+      </mesh>
+    </group>}
+    {active && <group ref={incomingRing}>
+      <mesh>
+        <ringGeometry args={[0.075, 0.09, 32]} />
+        <meshBasicMaterial color="#ffb38d" transparent opacity={0.85} side={THREE.DoubleSide} />
+      </mesh>
+    </group>}
     <mesh>
       <sphereGeometry args={[active ? 0.045 : 0.032, 16, 16]} />
       <meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} />
@@ -124,7 +145,7 @@ function SatelliteMarker({ marker, active, onSelect }: { marker: Marker; active:
   </group>;
 }
 
-function GlobeScene({ markers, selectedId, onSelect, reducedMotion }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean }) {
+function GlobeScene({ markers, selectedId, markerTransition, onSelect, reducedMotion }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition }) {
   const group = useRef<THREE.Group>(null);
   const selected = markers.find(marker => marker.id === selectedId);
   const targetRotation = selected ? THREE.MathUtils.degToRad(-selected.longitude) : 0;
@@ -159,7 +180,7 @@ function GlobeScene({ markers, selectedId, onSelect, reducedMotion }: Omit<Earth
       <EarthSurface />
       <CloudLayer />
       <Atmosphere />
-      {markers.map(marker => <SatelliteMarker key={marker.id} marker={marker} active={marker.id === selectedId} onSelect={onSelect} />)}
+      {markers.map(marker => <SatelliteMarker key={marker.id} marker={marker} active={marker.id === selectedId} transition={markerTransition} onSelect={onSelect} />)}
     </group>
   </>;
 }
@@ -171,10 +192,21 @@ function GlobeFallback() {
 export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "" }: EarthGlobeProps) {
   const selectedMarker = markers.find(marker => marker.id === selectedId);
   const reducedMotion = useReducedMotion();
+  const previousSelectedId = useRef(selectedId);
+  const [markerTransition, setMarkerTransition] = useState<MarkerTransition>({ fromId: null, toId: selectedId, startedAt: 0 });
+  useEffect(() => {
+    const fromId = previousSelectedId.current;
+    if (fromId === selectedId) return;
+    previousSelectedId.current = selectedId;
+    const startedAt = performance.now();
+    setMarkerTransition({ fromId, toId: selectedId, startedAt });
+    const timer = window.setTimeout(() => setMarkerTransition({ fromId: null, toId: selectedId, startedAt: 0 }), FOCUS_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [selectedId]);
   const markerGeometry = JSON.stringify(markers.map(marker => ({ id: marker.id, latitude: marker.latitude, longitude: marker.longitude })));
-  return <div className={`three-globe ${className}`} data-renderer="react-three-fiber" data-active-marker={selectedId} data-marker-count={markers.length} data-marker-geometry={markerGeometry} data-focus-longitude={selectedMarker?.longitude ?? 0} data-focus-duration={FOCUS_DURATION_MS} data-reduced-motion={reducedMotion} aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}>
+  return <div className={`three-globe ${className}`} data-renderer="react-three-fiber" data-active-marker={selectedId} data-transition-from={markerTransition.fromId || ""} data-transition-to={markerTransition.toId} data-marker-count={markers.length} data-marker-geometry={markerGeometry} data-focus-longitude={selectedMarker?.longitude ?? 0} data-focus-duration={FOCUS_DURATION_MS} data-reduced-motion={reducedMotion} aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}>
     <Canvas dpr={[1, 1.25]} frameloop="demand" camera={{ position: [0, 0, 3.2], fov: 38 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} fallback={<GlobeFallback />}>
-      <Suspense fallback={null}><GlobeScene markers={markers} selectedId={selectedId} onSelect={onSelect} reducedMotion={reducedMotion} /></Suspense>
+      <Suspense fallback={null}><GlobeScene markers={markers} selectedId={selectedId} markerTransition={markerTransition} onSelect={onSelect} reducedMotion={reducedMotion} /></Suspense>
     </Canvas>
   </div>;
 });

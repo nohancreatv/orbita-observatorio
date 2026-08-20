@@ -33,6 +33,12 @@ Os quatro estados de contingência foram revalidados com o canvas ativo: telemet
 
 O recorte de rótulos foi corrigido: somente o objeto em foco recebe rótulo no canvas, e o teste em viewport 482×479 confirmou que “Hubble” permaneceu integralmente dentro da área útil do globo.
 
+O ciclo de foco agora foi validado em desktop e celular: ao selecionar Hubble, o estado de transição registra ISS como origem e Hubble como destino, a longitude de foco muda, o marcador laranja transfere seu destaque durante 500 ms e a origem é removida ao término da rotação.
+
+### Transições multiobjeto
+
+O teste `verify-orbit-transitions.mjs` confirmou em desktop e celular a sequência ISS → Hubble → Tiangong → NOAA 19 → ISS. Em todas as oito execuções, a longitude do globo mudou, o par `data-transition-from/to` descreveu corretamente a troca, o marcador ativo e a telemetria foram atualizados, e o estado estabilizou após 500 ms com a origem removida.
+
 A correção definitiva substituiu rótulos HTML flutuantes por identificação no painel externo de foco. A validação percorreu ISS, Hubble, Tiangong e NOAA 19 em desktop e celular: o canvas teve zero rótulos suscetíveis a recorte, enquanto o painel externo exibiu corretamente o nome, a coordenada e o local de cada objeto.
 
 As capturas pós-correção confirmam que os quatro marcadores permanecem como pings compactos dentro da esfera, sem texto atravessando a borda. Em desktop, a leitura foi validada com NOAA 19 em foco; em celular, o seletor, o status e a área do globo permanecem legíveis, sem sobreposição de rótulos no canvas.

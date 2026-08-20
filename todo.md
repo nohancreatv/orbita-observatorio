@@ -58,3 +58,9 @@
 - [x] Validar executavelmente os quatro marcadores 3D em desktop e celular, incluindo limites e ausência de colisão problemática.
 - [x] Registrar a saída da validação de marcadores pós-correção no arquivo de evidências.
 - [x] Persistir e confirmar a saída final da validação de marcadores em desktop e celular.
+- [x] Animar uma rotação perceptível do globo entre longitudes de satélites selecionados.
+- [x] Animar a transferência do destaque laranja entre o marcador anterior e o novo marcador ativo.
+- [x] Validar a troca ISS, Hubble, Tiangong e NOAA 19 em desktop e celular.
+- [x] Validar em desktop e celular as transições entre ISS, Hubble, Tiangong e NOAA 19, incluindo rotação, marcadores e telemetria.
+- [x] Registrar a saída consolidada das transições multiobjeto no arquivo de validação.
+- [x] Persistir e confirmar a sequência completa de transições orbitais em desktop e celular.

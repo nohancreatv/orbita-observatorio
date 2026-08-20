@@ -12,6 +12,7 @@ try {
 
   const beforeRotation = await page.locator(".three-globe").getAttribute("data-focus-longitude");
   await page.getByRole("button", { name: "Hubble", exact: true }).click();
+  await page.waitForFunction(() => document.querySelector(".three-globe")?.getAttribute("data-transition-from") === "iss" && document.querySelector(".three-globe")?.getAttribute("data-transition-to") === "hubble", undefined, { timeout: 2_000 });
   await page.waitForFunction(() => {
     const activeMarker = document.querySelector(".three-globe")?.getAttribute("data-active-marker");
     const title = document.querySelector(".object-focus-copy h2")?.textContent;
@@ -30,16 +31,22 @@ try {
     groundLocation: document.querySelector(".ground-location-card strong")?.textContent?.trim(),
   }));
 
+  await page.waitForTimeout(650);
+  const settledTransition = await page.evaluate(() => ({
+    from: document.querySelector(".three-globe")?.getAttribute("data-transition-from"),
+    to: document.querySelector(".three-globe")?.getAttribute("data-transition-to"),
+  }));
+
   const hasTelemetry = Boolean(after.telemetry?.includes("altitude") && after.telemetry?.includes("velocidade") && !after.telemetry?.includes("—"));
   const hasGroundLocation = Boolean(after.groundLocation && !after.groundLocation.includes("identificando"));
   const expectedReducedMotion = process.env.E2E_REDUCED_MOTION === "1" ? "true" : "false";
-  if (after.activeMarker !== "hubble" || !after.title?.includes("Hubble") || !after.imageAlt?.includes("Hubble") || beforeRotation === after.rotation || after.rotationDuration !== "500" || after.reducedMotion !== expectedReducedMotion || !hasTelemetry || !hasGroundLocation) {
-    throw new Error(`A interação de foco não atualizou todos os elementos: ${JSON.stringify({ beforeRotation, after })}`);
+  if (after.activeMarker !== "hubble" || !after.title?.includes("Hubble") || !after.imageAlt?.includes("Hubble") || beforeRotation === after.rotation || after.rotationDuration !== "500" || after.reducedMotion !== expectedReducedMotion || settledTransition.from || settledTransition.to !== "hubble" || !hasTelemetry || !hasGroundLocation) {
+    throw new Error(`A interação de foco não atualizou todos os elementos: ${JSON.stringify({ beforeRotation, after, settledTransition })}`);
   }
 
   const screenshotPath = mobileMode ? "/home/ubuntu/webdev-static-assets/hubble-focus-e2e-mobile.png" : "/home/ubuntu/webdev-static-assets/hubble-focus-e2e.png";
   await page.screenshot({ path: screenshotPath, fullPage: false });
-  console.log(JSON.stringify({ verification: "passed", viewport: mobileMode ? "mobile" : "desktop", screenshotPath, beforeRotation, after }, null, 2));
+  console.log(JSON.stringify({ verification: "passed", viewport: mobileMode ? "mobile" : "desktop", screenshotPath, beforeRotation, after, transition: { from: "iss", to: "hubble", settled: settledTransition } }, null, 2));
 } finally {
   await browser.close();
 }

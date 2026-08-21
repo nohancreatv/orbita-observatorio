@@ -12,6 +12,7 @@ import {
   Gauge,
   LocateFixed,
   MapPin,
+  Navigation,
   Orbit,
   Radio,
   RefreshCw,
@@ -27,11 +28,12 @@ import { GlobeFallback } from "@/components/GlobeFallback";
 import { trpc } from "@/lib/trpc";
 import { useConsent } from "@/contexts/ConsentContext";
 import { createPassAlertKey, isFavorablePass, shouldSendPassAlert } from "@/lib/passAlerts";
+import { getObservationGuidance, getObservationReadiness, getWeatherDescription } from "@/lib/localHorizon";
 import "../multi-orbit.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type SatelliteId = "iss" | "hubble" | "tiangong" | "noaa19";
-type UserLocation = { latitude: number; longitude: number; label: string };
+type UserLocation = { latitude: number; longitude: number; label: string; accuracyMeters: number | null; capturedAt: number };
 type PassPrediction = RouterOutputs["orbit"]["issClosestPass"];
 type OrbitSnapshot = RouterOutputs["orbit"]["allSnapshots"][number];
 
@@ -157,24 +159,30 @@ export default function Home() {
     navigator.geolocation.getCurrentPosition(
       position => {
         const coordinates = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        const locationDetails = { accuracyMeters: Number.isFinite(position.coords.accuracy) ? Math.max(1, position.coords.accuracy) : null, capturedAt: Date.now() };
         userPlace.mutate(coordinates, {
           onSuccess: place => {
-            setUserLocation({ ...coordinates, label: place.label });
-            setStatusMessage(`Horizonte definido para ${place.label}.`);
+            setUserLocation({ ...coordinates, ...locationDetails, label: place.label });
+            setStatusMessage(`Horizonte definido para ${place.label}. A previsão e o céu local estão sendo atualizados.`);
             setIsLocating(false);
           },
           onError: () => {
-            setUserLocation({ ...coordinates, label: "sua região" });
-            setStatusMessage("Horizonte definido; a cidade não pôde ser identificada agora.");
+            setUserLocation({ ...coordinates, ...locationDetails, label: "sua região" });
+            setStatusMessage("Horizonte definido; a cidade não pôde ser identificada agora, mas a leitura local continua disponível.");
             setIsLocating(false);
           },
         });
       },
-      () => {
-        setStatusMessage("Não foi possível acessar a sua localização. Você pode tentar novamente quando quiser.");
+      error => {
+        const message = error.code === 1
+          ? "A localização foi recusada. Você pode autorizar o acesso nas configurações do navegador e tentar novamente."
+          : error.code === 3
+            ? "A localização demorou mais do que o esperado. Tente novamente em um local com melhor sinal."
+            : "Não foi possível determinar a sua localização agora. Você pode tentar novamente quando quiser.";
+        setStatusMessage(message);
         setIsLocating(false);
       },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 120000 },
     );
   };
 
@@ -213,6 +221,9 @@ export default function Home() {
   const storyExplanation = storyFailed ? "A fonte de curiosidades não respondeu agora. O rastreamento orbital continua disponível e você pode tentar novamente em instantes." : storyQuery.data?.explanation || "A leitura científica do dia aparecerá aqui assim que a fonte pública responder.";
   const observingConditions = observingQuery.data;
   const skyReadout = observingConditions?.cloudCover === null || observingConditions?.cloudCover === undefined ? "céu em leitura" : observingConditions.cloudCover < 25 ? "céu favorável" : observingConditions.cloudCover < 60 ? "nuvens variáveis" : "céu encoberto";
+  const horizonReadiness = getObservationReadiness({ cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm, hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance });
+  const horizonGuidance = getObservationGuidance({ cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm, hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance });
+  const localWeather = getWeatherDescription(observingConditions?.weatherCode);
   const launchDate = (value: string | null | undefined) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "horário a confirmar";
   const launchesLoading = launchesQuery.isLoading;
   const telemetryLoading = allSnapshotsQuery.isLoading && !allSnapshotsQuery.isError;
@@ -241,6 +252,17 @@ export default function Home() {
           </div>
           <div className="action-row"><button type="button" onClick={requestLocation} className="locate-button" disabled={isLocating}><LocateFixed size={18} aria-hidden="true" />{isLocating ? "localizando…" : userLocation ? "atualizar horizonte" : "usar minha localização"}<ArrowUpRight size={17} aria-hidden="true" /></button><p className="privacy-note">A posição é usada apenas para esta consulta e não é salva.</p></div>
           <div className="live-readout" role="status" aria-live="polite"><Radio size={15} aria-hidden="true" /><span>{statusMessage}</span></div>
+          {userLocation && <section className="local-horizon-summary" aria-labelledby="local-horizon-title">
+            <div className="local-horizon-summary__header"><div><span className="local-horizon-summary__eyebrow"><Navigation size={13} aria-hidden="true" /> seu posto de observação</span><h2 id="local-horizon-title">Horizonte em {userLocation.label}</h2></div><span className={`horizon-readiness horizon-readiness--${horizonReadiness.tone}`}>{horizonReadiness.label}</span></div>
+            <div className="local-horizon-summary__metrics">
+              <span><MapPin size={14} aria-hidden="true" /><b>posição</b>{formatCoordinate(userLocation.latitude, true)} · {formatCoordinate(userLocation.longitude, false)}</span>
+              <span><Crosshair size={14} aria-hidden="true" /><b>precisão</b>{userLocation.accuracyMeters ? `± ${formatNumber(userLocation.accuracyMeters)} m` : "estimativa do aparelho"}</span>
+              <span><Clock3 size={14} aria-hidden="true" /><b>ISS</b>{selectedSatellite === "iss" && prediction ? `${formatTimeFromNow(prediction.timestamp)} · ${formatNumber(prediction.distance)} km` : selectedSatellite === "iss" ? "calculando rota" : "selecione a ISS"}</span>
+              <span><CloudSun size={14} aria-hidden="true" /><b>céu</b>{observingQuery.isError ? "condições indisponíveis" : localWeather}</span>
+            </div>
+            <p className="local-horizon-summary__guidance">{horizonGuidance}</p>
+            <small>Leitura atualizada {new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(userLocation.capturedAt))} · coordenadas aproximadas exibidas para preservar privacidade.</small>
+          </section>}
         </div>
 
         <div className="orbital-stage multi-orbit-stage" aria-label={`Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais`}>

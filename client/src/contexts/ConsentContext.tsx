@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type ConsentPreferences = { advertising: boolean; updatedAt: string; version: 1 };
-type AdsbygoogleQueue = unknown[] & { pauseAdRequests?: number; orbitaAutoAdsStarted?: boolean };
+type AdsbygoogleQueue = unknown[] & { pauseAdRequests?: number };
 type ConsentContextValue = {
   isReady: boolean;
   preferences: ConsentPreferences | null;
@@ -36,11 +36,9 @@ function updateAdRequestPause(advertising: boolean) {
   const publisherId = import.meta.env.VITE_ADSENSE_PUBLISHER_ID?.trim();
   const ads = (window.adsbygoogle = window.adsbygoogle || []);
   ads.pauseAdRequests = advertising ? 0 : 1;
+  document.documentElement.dataset.adsRequests = advertising ? "resumed" : "paused";
 
-  if (!advertising || !publisherId || ads.orbitaAutoAdsStarted) return;
-  ads.orbitaAutoAdsStarted = true;
-  ads.push({ google_ad_client: publisherId, enable_page_level_ads: true });
-  window.dispatchEvent(new Event("orbita:adsense-ready"));
+  if (advertising && publisherId) window.dispatchEvent(new Event("orbita:adsense-ready"));
 }
 
 export function ConsentProvider({ children }: { children: ReactNode }) {
@@ -49,6 +47,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     updateGoogleConsent(false, "default");
+    updateAdRequestPause(false);
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {

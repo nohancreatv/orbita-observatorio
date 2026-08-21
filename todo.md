@@ -157,12 +157,19 @@
 - [x] Mapear os segredos e comandos necessários para o deploy Netlify disparado por GitHub Actions.
 - [x] Criar workflow GitHub Actions para validar e publicar automaticamente a branch principal no Netlify.
 - [x] Adicionar README.md detalhado com arquitetura, pré-requisitos, comandos locais, variáveis e testes.
-- [ ] Validar e publicar a automação e a documentação no repositório GitHub privado.
-- [ ] Remover a dependência da variável de repositório bloqueada pela permissão GitHub, mantendo o identificador público do site no workflow.
-- [ ] Preservar o Publisher ID público do AdSense no build automatizado para evitar regressão de monetização no deploy por Actions.
-- [ ] Corrigir o conflito entre a versão do pnpm declarada no projeto e a configuração do GitHub Actions.
-- [ ] Corrigir a falha dos testes Vitest no runner GitHub Actions sem reduzir a cobertura de regressão.
-- [ ] Corrigir a autenticação do deploy Netlify no GitHub Actions após a validação aprovada.
-- [ ] Tornar o código de verificação do AdSense detectável pelo rastreador na página pública.
-- [ ] Preservar o bloqueio de anúncios e requisições publicitárias até o consentimento explícito do visitante.
-- [ ] Validar a presença do código no HTML de produção e orientar uma nova solicitação de verificação AdSense.
+- [x] Validar e publicar a automação e a documentação no repositório GitHub privado.
+- [x] Remover a dependência da variável de repositório bloqueada pela permissão GitHub, mantendo o identificador público do site no workflow.
+- [x] Preservar o Publisher ID público do AdSense no build automatizado para evitar regressão de monetização no deploy por Actions.
+- [x] Corrigir o conflito entre a versão do pnpm declarada no projeto e a configuração do GitHub Actions.
+- [x] Corrigir a falha dos testes Vitest no runner GitHub Actions sem reduzir a cobertura de regressão.
+- [x] Corrigir a autenticação do deploy Netlify no GitHub Actions após a validação aprovada.
+- [x] Tornar o código de verificação do AdSense detectável pelo rastreador na página pública.
+- [x] Preservar o bloqueio de anúncios e requisições publicitárias até o consentimento explícito do visitante.
+- [x] Validar a presença do código no HTML de produção e orientar uma nova solicitação de verificação AdSense.
+- [x] Aguardar a retomada dos deploys de produção do Netlify, atualmente suspensos no projeto, antes de publicar a correção AdSense.
+- [x] Concluir a publicação AdSense usando uma única tentativa de deploy de produção, com validação local prévia para preservar os créditos Netlify.
+- [x] Sintetizar a metodologia aplicada ao observatório em um prompt mestre reutilizável, sem expor raciocínio interno privado.
+- [x] Redigir e revisar o prompt mestre em primeira pessoa, incluindo estratégia, engenharia, publicação, monetização e comunicação.
+- [x] Auditar o fluxo atual de geolocalização, previsão e condições de observação para identificar lacunas de utilidade.
+- [x] Exibir contexto local acionável após a permissão: precisão, horizonte temporal, condições e orientação de observação.
+- [x] Validar geolocalização concedida, negada e indisponível sem degradar telemetria nem responsividade.

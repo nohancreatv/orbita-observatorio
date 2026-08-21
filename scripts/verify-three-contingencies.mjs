@@ -36,7 +36,7 @@ try {
   await denied.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await verifyCanvas(denied, 'geolocalização negada');
   await denied.locator('.locate-button').click();
-  await denied.waitForFunction(() => document.body.textContent?.includes('Não foi possível acessar a sua localização.'), undefined, { timeout: 12_000 });
+  await denied.waitForFunction(() => document.body.textContent?.includes('A localização foi recusada.'), undefined, { timeout: 12_000 });
   checks.push('geolocalização negada');
 
   const geocode = await browser.newPage();
@@ -47,8 +47,18 @@ try {
   await geocode.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await verifyCanvas(geocode, 'geocodificação indisponível');
   await geocode.locator('.locate-button').click();
-  await geocode.waitForFunction(() => document.body.textContent?.includes('Horizonte definido; a cidade não pôde ser identificada agora.'), undefined, { timeout: 15_000 });
+  await geocode.waitForFunction(() => document.body.textContent?.includes('Horizonte definido; a cidade não pôde ser identificada agora, mas a leitura local continua disponível.'), undefined, { timeout: 15_000 });
   checks.push('geocodificação indisponível');
+
+  const horizon = await browser.newPage();
+  await horizon.addInitScript(() => {
+    navigator.geolocation.getCurrentPosition = success => success({ coords: { latitude: -23.55, longitude: -46.63, accuracy: 18 } });
+  });
+  await horizon.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+  await verifyCanvas(horizon, 'horizonte local detalhado');
+  await horizon.locator('.locate-button').click();
+  await horizon.waitForFunction(() => document.body.textContent?.includes('seu posto de observação') && document.body.textContent?.includes('± 18 m'), undefined, { timeout: 15_000 });
+  checks.push('horizonte local detalhado');
 
   console.log(JSON.stringify({ verification: 'passed', renderer: 'react-three-fiber', contingencies: checks }, null, 2));
 } finally {

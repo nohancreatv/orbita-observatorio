@@ -173,3 +173,8 @@
 - [x] Auditar o fluxo atual de geolocalização, previsão e condições de observação para identificar lacunas de utilidade.
 - [x] Exibir contexto local acionável após a permissão: precisão, horizonte temporal, condições e orientação de observação.
 - [x] Validar geolocalização concedida, negada e indisponível sem degradar telemetria nem responsividade.
+- [x] Mapear os dados orbitais e locais existentes para uma leitura prática de observação no dia atual.
+- [x] Criar a aba Observar hoje com oportunidade local, direção, condição do céu, orientação e estados de permissão claros.
+- [x] Integrar lembrete opt-in e navegação acessível sem regredir o globo, a telemetria ou o painel de horizonte local.
+- [x] Cobrir a nova aba com testes e validação responsiva antes de solicitar publicação.
+- [ ] Versionar e publicar a aba Observar hoje exclusivamente no Netlify, com um único push para a branch principal e sem checkpoint Manus.

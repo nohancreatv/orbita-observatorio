@@ -35,7 +35,7 @@ try {
   });
   await denied.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await verifyCanvas(denied, 'geolocalização negada');
-  await denied.locator('.locate-button').click();
+  await denied.locator('.hero-section .locate-button').click();
   await denied.waitForFunction(() => document.body.textContent?.includes('A localização foi recusada.'), undefined, { timeout: 12_000 });
   checks.push('geolocalização negada');
 
@@ -46,7 +46,7 @@ try {
   await geocode.route('**/api/trpc/orbit.userPlace**', route => route.abort());
   await geocode.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await verifyCanvas(geocode, 'geocodificação indisponível');
-  await geocode.locator('.locate-button').click();
+  await geocode.locator('.hero-section .locate-button').click();
   await geocode.waitForFunction(() => document.body.textContent?.includes('Horizonte definido; a cidade não pôde ser identificada agora, mas a leitura local continua disponível.'), undefined, { timeout: 15_000 });
   checks.push('geocodificação indisponível');
 
@@ -56,9 +56,13 @@ try {
   });
   await horizon.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await verifyCanvas(horizon, 'horizonte local detalhado');
-  await horizon.locator('.locate-button').click();
+  await horizon.locator('.hero-section .locate-button').click();
   await horizon.waitForFunction(() => document.body.textContent?.includes('seu posto de observação') && document.body.textContent?.includes('± 18 m'), undefined, { timeout: 15_000 });
   checks.push('horizonte local detalhado');
+
+  await horizon.locator('a[href="#observar-hoje"]').click();
+  await horizon.waitForFunction(() => document.querySelector('[data-testid="today-observation-panel"]')?.getAttribute('data-observation-state') !== "waiting" && document.body.textContent?.includes('Seu plano para observar hoje.'), undefined, { timeout: 15_000 });
+  checks.push('aba observar hoje');
 
   console.log(JSON.stringify({ verification: 'passed', renderer: 'react-three-fiber', contingencies: checks }, null, 2));
 } finally {

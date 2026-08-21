@@ -29,6 +29,7 @@ import { trpc } from "@/lib/trpc";
 import { useConsent } from "@/contexts/ConsentContext";
 import { createPassAlertKey, isFavorablePass, shouldSendPassAlert } from "@/lib/passAlerts";
 import { getObservationGuidance, getObservationReadiness, getWeatherDescription } from "@/lib/localHorizon";
+import { getTodayObservationState } from "@/lib/todayObservation";
 import "../multi-orbit.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -133,12 +134,12 @@ export default function Home() {
   }, [allSnapshots.length, allSnapshotsQuery.isError, allSnapshotsQuery.isSuccess, previewTelemetryFailure]);
 
   useEffect(() => {
-    if (selectedSatellite === "iss" && userLocation) {
+    if (userLocation) {
       closestPass.mutate({ latitude: userLocation.latitude, longitude: userLocation.longitude });
     }
-    // A previsão local depende da posição do visitante e é dedicada à ISS.
+    // A previsão local é dedicada à ISS e permanece disponível para a aba Observar hoje.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSatellite, userLocation]);
+  }, [userLocation]);
 
   useEffect(() => {
     if (!passAlertsEnabled || notificationPermission !== "granted" || !prediction || !userLocation || !proximityState) return;
@@ -224,6 +225,7 @@ export default function Home() {
   const horizonReadiness = getObservationReadiness({ cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm, hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance });
   const horizonGuidance = getObservationGuidance({ cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm, hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance });
   const localWeather = getWeatherDescription(observingConditions?.weatherCode);
+  const todayObservation = getTodayObservationState({ hasLocation: Boolean(userLocation), hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance, cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm });
   const launchDate = (value: string | null | undefined) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "horário a confirmar";
   const launchesLoading = launchesQuery.isLoading;
   const telemetryLoading = allSnapshotsQuery.isLoading && !allSnapshotsQuery.isError;
@@ -236,6 +238,7 @@ export default function Home() {
       <div className="observatory-content">
       <header className="site-header">
         <a href="#inicio" className="brand-mark" aria-label="Órbita, início"><img src="/manus-storage/orbita-logo_99dcd0cb.png" alt="" className="brand-symbol" width="38" height="38" decoding="async" /><span>órbita</span></a>
+        <nav className="site-navigation" aria-label="Navegação do observatório"><a href="#inicio">ao vivo</a><a href="#observar-hoje">observar hoje</a></nav>
         <div className="header-meta"><span className="signal-dot" aria-hidden="true" /><span>observatório orbital</span><span className="meta-divider" /><time dateTime={clock.toISOString()}>{currentTime} local</time></div>
       </header>
 
@@ -289,6 +292,13 @@ export default function Home() {
       </section>
 
       <section className="ground-location-section" aria-labelledby="ground-title"><div className="ground-location-title"><p className="eyebrow"><MapPin size={15} aria-hidden="true" /> Da coordenada ao território</p><h2 id="ground-title">Onde está <em>{selectedShortName}</em> neste instante?</h2></div><div className="ground-location-card"><span className="location-label">ponto suborbital aproximado</span><strong>{snapshot?.groundLocation.label || "identificando cidade e país…"}</strong><div className="location-coordinates">{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</div><p>{snapshot?.groundLocation.isOceanOrRemote ? "Este ponto pode estar sobre oceano, áreas remotas ou uma região onde uma cidade não foi identificada." : "A localização indica o ponto da superfície terrestre mais diretamente abaixo do satélite; não representa uma rota de sobrevoo visível."}</p></div><a href="#fontes" className="source-link ground-source-link">como lemos o ponto terrestre <ArrowUpRight size={16} aria-hidden="true" /></a></section>
+
+      <section id="observar-hoje" className="today-observing-section" aria-labelledby="today-observing-title" data-testid="today-observation-panel" data-observation-state={todayObservation.tone}>
+        <div className="today-observing-heading"><p className="eyebrow"><Telescope size={15} aria-hidden="true" /> Plano de observação</p><h2 id="today-observing-title">Seu plano para <em>observar hoje.</em></h2><p>Uma leitura prática da próxima passagem da ISS, combinada com o estado do seu horizonte e do céu local.</p></div>
+        <div className={`today-observing-board today-observing-board--${todayObservation.tone}`}>
+          <div className="today-observing-board__header"><span className="today-observing-board__signal" aria-hidden="true" /><div><span>leitura para hoje</span><strong>{todayObservation.label}</strong></div>{userLocation && <small><MapPin size={13} aria-hidden="true" /> {userLocation.label}</small>}</div>
+          {!userLocation ? <div className="today-observing-board__empty"><h3>{todayObservation.headline}</h3><p>{todayObservation.detail}</p><button type="button" className="locate-button" onClick={requestLocation} disabled={isLocating}><LocateFixed size={17} aria-hidden="true" />{isLocating ? "localizando…" : "definir meu horizonte"}<ArrowUpRight size={16} aria-hidden="true" /></button></div> : <><div className="today-observing-board__summary"><h3>{todayObservation.headline}</h3><p>{todayObservation.detail}</p></div><div className="today-observing-grid"><article><span><Clock3 size={15} aria-hidden="true" /> melhor momento</span><strong>{prediction ? formatTimeFromNow(prediction.timestamp) : "em cálculo"}</strong><p>{prediction ? formatDate(prediction.timestamp) : "consultando a rota da ISS"}</p></article><article><span><Crosshair size={15} aria-hidden="true" /> aproximação</span><strong>{prediction ? `${formatNumber(prediction.distance)} km` : "—"}</strong><p>{prediction && proximityState ? "leitura favorável" : "distância da previsão"}</p></article><article><span><CloudSun size={15} aria-hidden="true" /> céu local</span><strong>{observingQuery.isError ? "indisponível" : skyReadout}</strong><p>{observingConditions?.cloudCover === null || observingConditions?.cloudCover === undefined ? "nuvens em leitura" : `${formatNumber(observingConditions.cloudCover)}% de nuvens · ${observingConditions.visibilityKm === null || observingConditions.visibilityKm === undefined ? "visibilidade em leitura" : `${formatNumber(observingConditions.visibilityKm, 1)} km`}`}</p></article></div><div className="today-observing-board__action"><div><span>orientação</span><p>{horizonGuidance}</p></div>{prediction && proximityState ? <PassAlertControl enabled={passAlertsEnabled} onToggle={togglePassAlert} /> : <button type="button" className="text-button" onClick={() => setSelectedSatellite("iss")}>focar a ISS no globo <ArrowUpRight size={16} aria-hidden="true" /></button>}</div><p className="today-observing-board__note">A direção e a elevação aparentes variam ao longo da passagem. Esta leitura não substitui uma previsão astronômica detalhada de trajeto no céu.</p></>}</div>
+      </section>
 
       <section className="passage-section" aria-labelledby="passage-title"><div className="passage-art" aria-hidden="true"><img src="/manus-storage/iss-passage-panel_d049613e.png" alt="" loading="lazy" decoding="async" /><div className="art-annotation annotation-one">linha de passagem</div><div className="art-annotation annotation-two">horizonte local</div></div><div className="passage-copy"><p className="eyebrow"><Sparkles size={15} aria-hidden="true" /> O seu horizonte</p><h2 id="passage-title">A próxima chance de ver a ISS começa pela sua cidade.</h2>{userLocation ? <div className="passage-result"><div className="location-line"><MapPin size={18} aria-hidden="true" /><span>{userLocation.label}</span></div>{selectedSatellite !== "iss" ? <p className="result-detail">A previsão local de passagem é calculada para a ISS. Selecione-a na constelação para consultar o seu horizonte.</p> : prediction ? <><p className={proximityState ? "result-status is-good" : "result-status"}>{proximityState ? "Boa aproximação prevista" : "Passagem mais próxima no período"}</p><strong className="passage-time">{formatTimeFromNow(prediction.timestamp)}</strong><p className="result-detail">A ISS deve passar a cerca de {formatNumber(prediction.distance)} km da sua posição, por volta de {formatDate(prediction.timestamp)}.</p>{proximityState && <PassAlertControl enabled={passAlertsEnabled} onToggle={togglePassAlert} />}</> : <p className="result-detail">Estamos consultando a rota das próximas duas horas.</p>}</div> : <div className="passage-empty"><p>Conte onde você está e calcularemos a aproximação mais promissora da ISS nas próximas duas horas.</p><button type="button" className="text-button" onClick={requestLocation}>definir meu horizonte <ArrowUpRight size={16} aria-hidden="true" /></button></div>}<p className="visibility-caveat">A observação a olho nu depende também da iluminação solar, da elevação e das condições de nuvens.</p></div></section>
 

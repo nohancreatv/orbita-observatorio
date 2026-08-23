@@ -1,18 +1,17 @@
 /** CARTOGRAFIA DO CREPÚSCULO — leitura espacial de múltiplos objetos orbitais. */
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { inferRouterOutputs } from "@trpc/server";
 import {
   ArrowUpRight,
-  Bell,
-  BellRing,
   Clock3,
   Crosshair,
   CloudSun,
   Eye,
+  Globe,
   Gauge,
+  AlertTriangle,
   LocateFixed,
   MapPin,
-  Navigation,
   Orbit,
   Radio,
   RefreshCw,
@@ -21,32 +20,25 @@ import {
   Satellite,
   Sparkles,
   Telescope,
+  Flame,
 } from "lucide-react";
 import type { AppRouter } from "../../../server/routers";
-import { AdSlot } from "@/components/AdSlot";
-import { GlobeFallback } from "@/components/GlobeFallback";
 import { trpc } from "@/lib/trpc";
-import { useConsent } from "@/contexts/ConsentContext";
-import { createPassAlertKey, isFavorablePass, shouldSendPassAlert } from "@/lib/passAlerts";
-import { getObservationGuidance, getObservationReadiness, getWeatherDescription } from "@/lib/localHorizon";
-import { getTodayObservationState } from "@/lib/todayObservation";
+import { focusRotation, markerClassName, normaliseLongitude, projectOnGlobe } from "@/lib/orbitVisual";
 import "../multi-orbit.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type SatelliteId = "iss" | "hubble" | "tiangong" | "noaa19";
-type UserLocation = { latitude: number; longitude: number; label: string; accuracyMeters: number | null; capturedAt: number };
+type UserLocation = { latitude: number; longitude: number; label: string };
 type PassPrediction = RouterOutputs["orbit"]["issClosestPass"];
 type OrbitSnapshot = RouterOutputs["orbit"]["allSnapshots"][number];
 
 const OBJECT_IMAGES: Record<SatelliteId, string> = {
-  iss: "/manus-storage/orbita-iss-card_4ac52eb9.svg",
-  hubble: "/manus-storage/orbita-hubble-card_dc8bbcaf.svg",
-  tiangong: "/manus-storage/orbita-tiangong-card_81d63320.svg",
-  noaa19: "/manus-storage/orbita-noaa19-card_2732cd63.svg",
+  iss: "/manus-storage/orbita-iss-card_4ac52eb9.jpg",
+  hubble: "/manus-storage/orbita-hubble-card_dc8bbcaf.jpg",
+  tiangong: "/manus-storage/orbita-tiangong-card_81d63320.jpg",
+  noaa19: "/manus-storage/orbita-noaa19-card_2732cd63.jpg",
 };
-
-const EarthGlobe = lazy(() => import("@/components/EarthGlobe").then(module => ({ default: module.EarthGlobe })));
-const PASS_ALERT_STORAGE_KEY = "orbita-pass-alert-enabled";
 
 function formatNumber(value: number | null | undefined, maximumFractionDigits = 0) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
@@ -76,21 +68,12 @@ function getVisibilityCopy(visibility?: string) {
   return visibility || "aguardando sinal";
 }
 
-function PassAlertControl({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
-  return <div className="passage-alert"><button type="button" className={enabled ? "pass-alert-button is-active" : "pass-alert-button"} onClick={onToggle} aria-pressed={enabled}>{enabled ? <BellRing size={16} aria-hidden="true" /> : <Bell size={16} aria-hidden="true" />}{enabled ? "alerta ativo nesta sessão" : "avisar quando estiver próximo"}</button><p>O aviso é exibido até 10 minutos antes da aproximação e funciona enquanto esta página estiver aberta.</p></div>;
-}
-
 export default function Home() {
-  const { clearPreferences } = useConsent();
   const [selectedSatellite, setSelectedSatellite] = useState<SatelliteId>("iss");
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Conectando à constelação orbital…");
   const [clock, setClock] = useState(() => new Date());
-  const [passAlertsEnabled, setPassAlertsEnabled] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("unsupported");
-  const [shouldLoadGlobe, setShouldLoadGlobe] = useState(false);
-  const [previewPassTimestamp] = useState(() => Math.floor(Date.now() / 1000) + 90);
 
   const catalogQuery = trpc.orbit.catalog.useQuery(undefined, { staleTime: 60 * 60_000 });
   const allSnapshotsQuery = trpc.orbit.allSnapshots.useQuery(undefined, { refetchInterval: 15_000, retry: 1 });
@@ -98,17 +81,16 @@ export default function Home() {
   const launchesQuery = trpc.space.launches.useQuery(undefined, { staleTime: 20 * 60_000, retry: 1 });
   const userPlace = trpc.orbit.userPlace.useMutation();
   const closestPass = trpc.orbit.issClosestPass.useMutation();
-  const previewTelemetryFailure = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-falha-telemetria");
 
   const allSnapshots = allSnapshotsQuery.data || [];
   const snapshot = allSnapshots.find(item => item.satellite.id === selectedSatellite);
-  const previewPassAlert = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-alerta-passagem");
-  const livePrediction: PassPrediction | undefined = closestPass.data;
-  const prediction: PassPrediction | undefined = previewPassAlert ? { timestamp: previewPassTimestamp, distance: 300 } as PassPrediction : livePrediction;
-  const proximityState = Boolean(prediction && isFavorablePass(prediction.distance));
+  const prediction: PassPrediction | undefined = closestPass.data;
   const satellites = catalogQuery.data || [];
   const observingInput = useMemo(() => userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : { latitude: 0, longitude: 0 }, [userLocation]);
   const observingQuery = trpc.observation.conditions.useQuery(observingInput, { enabled: Boolean(userLocation), staleTime: 15 * 60_000, retry: 1 });
+  const epicQuery = trpc.space.epic.useQuery(undefined, { staleTime: 30 * 60_000, retry: 1 });
+  const spaceWeatherQuery = trpc.space.weather.useQuery(undefined, { staleTime: 30 * 60_000, retry: 1 });
+  const asteroidsQuery = trpc.space.asteroids.useQuery(undefined, { staleTime: 60 * 60_000, retry: 1 });
 
   useEffect(() => {
     const interval = window.setInterval(() => setClock(new Date()), 1000);
@@ -116,39 +98,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!("Notification" in window)) return;
-    setNotificationPermission(Notification.permission);
-    setPassAlertsEnabled(sessionStorage.getItem(PASS_ALERT_STORAGE_KEY) === "true" && Notification.permission === "granted");
-  }, []);
-
-  useEffect(() => {
-    if (allSnapshots.length > 0) setShouldLoadGlobe(true);
-  }, [allSnapshots.length]);
-
-  useEffect(() => {
     if (allSnapshotsQuery.isSuccess && allSnapshots.length) {
       const instant = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
       setStatusMessage(`${allSnapshots.length} objetos orbitais sincronizados às ${instant}.`);
     }
-    if (allSnapshotsQuery.isError || previewTelemetryFailure) setStatusMessage("O rastreador está indisponível agora. Tente atualizar em instantes.");
-  }, [allSnapshots.length, allSnapshotsQuery.isError, allSnapshotsQuery.isSuccess, previewTelemetryFailure]);
+    if (allSnapshotsQuery.isError) setStatusMessage("O rastreador está indisponível agora. Tente atualizar em instantes.");
+  }, [allSnapshots.length, allSnapshotsQuery.isError, allSnapshotsQuery.isSuccess]);
 
   useEffect(() => {
-    if (userLocation) {
+    if (selectedSatellite === "iss" && userLocation) {
       closestPass.mutate({ latitude: userLocation.latitude, longitude: userLocation.longitude });
     }
-    // A previsão local é dedicada à ISS e permanece disponível para a aba Observar hoje.
+    // A previsão local depende da posição do visitante e é dedicada à ISS.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLocation]);
-
-  useEffect(() => {
-    if (!passAlertsEnabled || notificationPermission !== "granted" || !prediction || !userLocation || !proximityState) return;
-    const notificationKey = createPassAlertKey(prediction.timestamp, userLocation.latitude, userLocation.longitude);
-    if (!shouldSendPassAlert({ enabled: passAlertsEnabled, permission: notificationPermission, timestampSeconds: prediction.timestamp, distanceKm: prediction.distance, nowMs: clock.getTime(), alreadyAlerted: Boolean(sessionStorage.getItem(notificationKey)) })) return;
-    sessionStorage.setItem(notificationKey, "true");
-    const alert = new Notification("Órbita — passagem próxima", { body: `A ISS terá uma aproximação favorável ${formatTimeFromNow(prediction.timestamp)}. Confira as condições do seu horizonte.`, tag: notificationKey, icon: "/manus-storage/orbita-logo_99dcd0cb.svg" });
-    alert.onclick = () => window.focus();
-  }, [clock, notificationPermission, passAlertsEnabled, prediction, proximityState, userLocation]);
+  }, [selectedSatellite, userLocation]);
 
   const requestLocation = () => {
     if (!navigator.geolocation) {
@@ -160,85 +123,50 @@ export default function Home() {
     navigator.geolocation.getCurrentPosition(
       position => {
         const coordinates = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-        const locationDetails = { accuracyMeters: Number.isFinite(position.coords.accuracy) ? Math.max(1, position.coords.accuracy) : null, capturedAt: Date.now() };
         userPlace.mutate(coordinates, {
           onSuccess: place => {
-            setUserLocation({ ...coordinates, ...locationDetails, label: place.label });
-            setStatusMessage(`Horizonte definido para ${place.label}. A previsão e o céu local estão sendo atualizados.`);
+            setUserLocation({ ...coordinates, label: place.label });
+            setStatusMessage(`Horizonte definido para ${place.label}.`);
             setIsLocating(false);
           },
           onError: () => {
-            setUserLocation({ ...coordinates, ...locationDetails, label: "sua região" });
-            setStatusMessage("Horizonte definido; a cidade não pôde ser identificada agora, mas a leitura local continua disponível.");
+            setUserLocation({ ...coordinates, label: "sua região" });
+            setStatusMessage("Horizonte definido; a cidade não pôde ser identificada agora.");
             setIsLocating(false);
           },
         });
       },
-      error => {
-        const message = error.code === 1
-          ? "A localização foi recusada. Você pode autorizar o acesso nas configurações do navegador e tentar novamente."
-          : error.code === 3
-            ? "A localização demorou mais do que o esperado. Tente novamente em um local com melhor sinal."
-            : "Não foi possível determinar a sua localização agora. Você pode tentar novamente quando quiser.";
-        setStatusMessage(message);
+      () => {
+        setStatusMessage("Não foi possível acessar a sua localização. Você pode tentar novamente quando quiser.");
         setIsLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 120000 },
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 },
     );
-  };
-
-  const togglePassAlert = async () => {
-    if (!userLocation) {
-      requestLocation();
-      return;
-    }
-    if (!("Notification" in window)) {
-      setStatusMessage("Este navegador não oferece alertas do sistema. A previsão continua visível nesta página.");
-      return;
-    }
-    const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-    setNotificationPermission(permission);
-    if (permission !== "granted") {
-      setStatusMessage("Os alertas do navegador não foram autorizados. Você pode alterar essa escolha nas configurações do navegador.");
-      return;
-    }
-    const nextValue = !passAlertsEnabled;
-    sessionStorage.setItem(PASS_ALERT_STORAGE_KEY, String(nextValue));
-    setPassAlertsEnabled(nextValue);
-    setStatusMessage(nextValue ? "Alerta ativado para a próxima aproximação favorável enquanto esta página estiver aberta." : "Alerta de passagem desativado para esta sessão.");
   };
 
   const selectedShortName = snapshot?.satellite.shortName || "satélite";
   const selectedName = snapshot?.satellite.name || "objeto orbital";
+  const centerLongitude = snapshot?.longitude || 0;
+  const centerLatitude = snapshot?.latitude || 0;
   const selectedImage = OBJECT_IMAGES[selectedSatellite];
-  const groundPortraitUrl = snapshot ? `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude}`)}&zoom=4&size=520x320&maptype=mapnik&markers=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude},orange-pushpin`)}` : "/manus-storage/iss-map-texture_2bd39705.svg";
+  const groundPortraitUrl = snapshot ? `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude}`)}&zoom=4&size=520x320&maptype=mapnik&markers=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude},orange-pushpin`)}` : "/manus-storage/iss-map-texture_2bd39705.png";
   const currentTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(clock);
+  const proximityState = prediction && prediction.distance < 2500;
   const previewStoryFailure = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-falha-nasa");
-  const previewEmptyStory = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-nasa-vazia");
-  const spaceStory = previewEmptyStory ? null : storyQuery.data;
-  const storyFailed = storyQuery.isError || previewStoryFailure || (!storyQuery.isLoading && !spaceStory);
-  const storyLoading = storyQuery.isLoading && !storyFailed;
+  const storyFailed = storyQuery.isError || previewStoryFailure;
   const storyTitle = storyFailed ? "A janela do cosmos está temporariamente fechada." : storyQuery.data?.title || "Abrindo o diário de bordo da NASA…";
   const storyExplanation = storyFailed ? "A fonte de curiosidades não respondeu agora. O rastreamento orbital continua disponível e você pode tentar novamente em instantes." : storyQuery.data?.explanation || "A leitura científica do dia aparecerá aqui assim que a fonte pública responder.";
   const observingConditions = observingQuery.data;
   const skyReadout = observingConditions?.cloudCover === null || observingConditions?.cloudCover === undefined ? "céu em leitura" : observingConditions.cloudCover < 25 ? "céu favorável" : observingConditions.cloudCover < 60 ? "nuvens variáveis" : "céu encoberto";
-  const horizonReadiness = getObservationReadiness({ cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm, hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance });
-  const horizonGuidance = getObservationGuidance({ cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm, hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance });
-  const localWeather = getWeatherDescription(observingConditions?.weatherCode);
-  const todayObservation = getTodayObservationState({ hasLocation: Boolean(userLocation), hasPassPrediction: Boolean(prediction), passDistanceKm: prediction?.distance, cloudCover: observingConditions?.cloudCover, visibilityKm: observingConditions?.visibilityKm });
   const launchDate = (value: string | null | undefined) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "horário a confirmar";
-  const launchesLoading = launchesQuery.isLoading;
-  const telemetryLoading = allSnapshotsQuery.isLoading && !allSnapshotsQuery.isError;
-  const globeMarkers = useMemo(() => allSnapshots.map(item => ({ id: item.satellite.id, shortName: item.satellite.shortName, name: item.satellite.name, latitude: item.latitude, longitude: item.longitude })), [allSnapshots]);
+  const selectedProjection = snapshot ? projectOnGlobe(snapshot.latitude, snapshot.longitude, centerLongitude) : null;
+  const globeStyle = { "--globe-rotation": focusRotation(centerLongitude), "--focus-latitude": `${centerLatitude}` } as React.CSSProperties;
 
   return (
     <main className="observatory-shell">
       <div className="star-surface" aria-hidden="true" />
-      <div className="observatory-layout">
-      <div className="observatory-content">
       <header className="site-header">
-        <a href="#inicio" className="brand-mark" aria-label="Órbita, início"><img src="/manus-storage/orbita-logo_99dcd0cb.svg" alt="" className="brand-symbol" width="38" height="38" decoding="async" /><span>órbita</span></a>
-        <nav className="site-navigation" aria-label="Navegação do observatório"><a href="#inicio">ao vivo</a><a href="#observar-hoje">observar hoje</a></nav>
+        <a href="#inicio" className="brand-mark" aria-label="Órbita, início"><img src="/manus-storage/orbita-logo_99dcd0cb.png" alt="" className="brand-symbol" /><span>órbita</span></a>
         <div className="header-meta"><span className="signal-dot" aria-hidden="true" /><span>observatório orbital</span><span className="meta-divider" /><time dateTime={clock.toISOString()}>{currentTime} local</time></div>
       </header>
 
@@ -255,35 +183,43 @@ export default function Home() {
           </div>
           <div className="action-row"><button type="button" onClick={requestLocation} className="locate-button" disabled={isLocating}><LocateFixed size={18} aria-hidden="true" />{isLocating ? "localizando…" : userLocation ? "atualizar horizonte" : "usar minha localização"}<ArrowUpRight size={17} aria-hidden="true" /></button><p className="privacy-note">A posição é usada apenas para esta consulta e não é salva.</p></div>
           <div className="live-readout" role="status" aria-live="polite"><Radio size={15} aria-hidden="true" /><span>{statusMessage}</span></div>
-          {userLocation && <section className="local-horizon-summary" aria-labelledby="local-horizon-title">
-            <div className="local-horizon-summary__header"><div><span className="local-horizon-summary__eyebrow"><Navigation size={13} aria-hidden="true" /> seu posto de observação</span><h2 id="local-horizon-title">Horizonte em {userLocation.label}</h2></div><span className={`horizon-readiness horizon-readiness--${horizonReadiness.tone}`}>{horizonReadiness.label}</span></div>
-            <div className="local-horizon-summary__metrics">
-              <span><MapPin size={14} aria-hidden="true" /><b>posição</b>{formatCoordinate(userLocation.latitude, true)} · {formatCoordinate(userLocation.longitude, false)}</span>
-              <span><Crosshair size={14} aria-hidden="true" /><b>precisão</b>{userLocation.accuracyMeters ? `± ${formatNumber(userLocation.accuracyMeters)} m` : "estimativa do aparelho"}</span>
-              <span><Clock3 size={14} aria-hidden="true" /><b>ISS</b>{selectedSatellite === "iss" && prediction ? `${formatTimeFromNow(prediction.timestamp)} · ${formatNumber(prediction.distance)} km` : selectedSatellite === "iss" ? "calculando rota" : "selecione a ISS"}</span>
-              <span><CloudSun size={14} aria-hidden="true" /><b>céu</b>{observingQuery.isError ? "condições indisponíveis" : localWeather}</span>
-            </div>
-            <p className="local-horizon-summary__guidance">{horizonGuidance}</p>
-            <small>Leitura atualizada {new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(userLocation.capturedAt))} · coordenadas aproximadas exibidas para preservar privacidade.</small>
-          </section>}
         </div>
 
         <div className="orbital-stage multi-orbit-stage" aria-label={`Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais`}>
-          <img src="/manus-storage/iss-hero-earth_dc590d13.svg" alt="Terra vista do espaço" className="hero-earth-art" decoding="async" fetchPriority="high" />
+          <img src="/manus-storage/iss-hero-earth_dc590d13.png" alt="Terra vista do espaço" className="hero-earth-art" />
           <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
-          {shouldLoadGlobe ? <Suspense fallback={<GlobeFallback />}><EarthGlobe markers={globeMarkers} selectedId={selectedSatellite} onSelect={id => setSelectedSatellite(id as SatelliteId)} userLocation={userLocation} className="three-globe-interactive" /></Suspense> : <GlobeFallback />}
+          <div className="globe-frame globe-frame-interactive" style={globeStyle}>
+            <div className="globe-ocean" aria-hidden="true" />
+            <div className="globe-map-overlay" aria-hidden="true" />
+            <div className="globe-relief" aria-hidden="true" />
+            <div className="globe-clouds globe-clouds-one" aria-hidden="true" />
+            <div className="globe-clouds globe-clouds-two" aria-hidden="true" />
+            <div className="globe-grid globe-grid-longitude" aria-hidden="true" />
+            <div className="globe-grid globe-grid-latitude" aria-hidden="true" />
+            <div className="globe-terminator" aria-hidden="true" />
+            <div className="globe-equator" aria-hidden="true" />
+            <div className="orbital-path orbital-path-one" aria-hidden="true" />
+            <div className="orbital-path orbital-path-two" aria-hidden="true" />
+            {allSnapshots.map(item => {
+              const point = projectOnGlobe(item.latitude, item.longitude, centerLongitude);
+              const active = item.satellite.id === selectedSatellite;
+              return <button key={item.satellite.id} type="button" onClick={() => setSelectedSatellite(item.satellite.id as SatelliteId)} className={markerClassName(item.satellite.id, selectedSatellite)} style={{ left: point.left, top: point.top, opacity: point.opacity, transform: `translate(-50%, -50%) scale(${point.scale})` }} aria-label={`Focar ${item.satellite.name}`} aria-pressed={active}><span className="marker-halo" /><Satellite size={active ? 16 : 12} strokeWidth={active ? 2.5 : 2} /><span className="marker-label">{item.satellite.shortName}</span></button>;
+            })}
+            {selectedProjection && <div className="focus-reticle" style={{ left: selectedProjection.left, top: selectedProjection.top }} aria-hidden="true"><span /><span /></div>}
+            <div className="globe-scale-label globe-scale-north">90° N</div><div className="globe-scale-label globe-scale-equator">equador</div><div className="globe-scale-label globe-scale-south">90° S</div>
+          </div>
           <div className="globe-badge globe-badge-wide"><div className="badge-icon"><Crosshair size={17} aria-hidden="true" /></div><div><span>{selectedShortName} agora</span><strong>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "sincronizando coordenadas"}</strong><small><MapPin size={11} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização terrestre em leitura"}</small></div></div>
           <div className="orbit-caption orbit-caption-bottom"><span /> foco: {selectedShortName}</div>
         </div>
       </section>
 
       <section className="object-focus-section" aria-labelledby="object-focus-title">
-        <div className="object-focus-image"><img src={selectedImage} alt={`Imagem orbital de ${selectedName}`} loading="lazy" decoding="async" /><div className="object-image-caption">imagem de referência · {selectedShortName}</div></div>
+        <div className="object-focus-image"><img src={selectedImage} alt={`Imagem orbital de ${selectedName}`} /><div className="object-image-caption">imagem de referência · {selectedShortName}</div></div>
         <div className="object-focus-copy"><p className="eyebrow"><Crosshair size={15} aria-hidden="true" /> Objeto em foco</p><h2 id="object-focus-title">{selectedName}</h2><p>{snapshot?.satellite.category || "Objeto orbital"} · NORAD {snapshot?.satellite.noradId || "—"}. Ao selecionar outro marcador, o globo percorre a longitude correspondente e preserva todos os demais objetos na mesma leitura.</p><div className="object-focus-data"><span><MapPin size={14} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização em leitura"}</span><span><Orbit size={14} aria-hidden="true" /> {getVisibilityCopy(snapshot?.visibility)}</span></div></div>
-        <aside className="object-ground-portrait"><img src={groundPortraitUrl} alt={snapshot ? `Mapa do ponto suborbital de ${selectedName} em ${snapshot.groundLocation.label}` : "Mapa do ponto suborbital em leitura"} loading="lazy" decoding="async" onError={event => { event.currentTarget.src = "/manus-storage/iss-map-texture_2bd39705.svg"; }} /><div className="ground-portrait-overlay"><span>retrato terrestre</span><strong>{snapshot?.groundLocation.label || "localização em leitura"}</strong><small>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</small><div className="ground-portrait-details"><span><b>superfície</b>{snapshot?.groundLocation.isOceanOrRemote ? "oceano ou região remota" : "território continental"}</span><span><b>leitura</b>{getVisibilityCopy(snapshot?.visibility)}</span></div><a href={snapshot?.sourceUrl || "/fontes"} target={snapshot?.sourceUrl ? "_blank" : undefined} rel="noreferrer">fonte orbital <ArrowUpRight size={13} aria-hidden="true" /></a></div></aside>
+        <aside className="object-ground-portrait"><img src={groundPortraitUrl} alt={snapshot ? `Mapa do ponto suborbital de ${selectedName} em ${snapshot.groundLocation.label}` : "Mapa do ponto suborbital em leitura"} onError={event => { event.currentTarget.src = "/manus-storage/iss-map-texture_2bd39705.png"; }} /><div className="ground-portrait-overlay"><span>retrato terrestre</span><strong>{snapshot?.groundLocation.label || "localização em leitura"}</strong><small>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</small><a href={snapshot?.sourceUrl || "/fontes"} target={snapshot?.sourceUrl ? "_blank" : undefined} rel="noreferrer">fonte orbital <ArrowUpRight size={13} aria-hidden="true" /></a></div></aside>
       </section>
 
-      <section className={telemetryLoading ? "telemetry-strip is-loading" : "telemetry-strip"} aria-label={`Telemetria atual de ${selectedShortName}`} aria-busy={telemetryLoading}>
+      <section className="telemetry-strip" aria-label={`Telemetria atual de ${selectedShortName}`}>
         <article className="telemetry-item telemetry-primary"><div className="telemetry-icon"><Orbit size={18} aria-hidden="true" /></div><div><span className="telemetry-label">estado da órbita</span><strong>{getVisibilityCopy(snapshot?.visibility)}</strong></div></article>
         <article className="telemetry-item"><Ruler size={18} aria-hidden="true" /><div><span className="telemetry-label">altitude</span><strong>{snapshot ? `${formatNumber(snapshot.altitude, 1)} km` : "—"}</strong></div></article>
         <article className="telemetry-item"><Gauge size={18} aria-hidden="true" /><div><span className="telemetry-label">velocidade</span><strong>{snapshot ? `${formatNumber(snapshot.velocity)} km/h` : "—"}</strong></div></article>
@@ -293,14 +229,7 @@ export default function Home() {
 
       <section className="ground-location-section" aria-labelledby="ground-title"><div className="ground-location-title"><p className="eyebrow"><MapPin size={15} aria-hidden="true" /> Da coordenada ao território</p><h2 id="ground-title">Onde está <em>{selectedShortName}</em> neste instante?</h2></div><div className="ground-location-card"><span className="location-label">ponto suborbital aproximado</span><strong>{snapshot?.groundLocation.label || "identificando cidade e país…"}</strong><div className="location-coordinates">{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</div><p>{snapshot?.groundLocation.isOceanOrRemote ? "Este ponto pode estar sobre oceano, áreas remotas ou uma região onde uma cidade não foi identificada." : "A localização indica o ponto da superfície terrestre mais diretamente abaixo do satélite; não representa uma rota de sobrevoo visível."}</p></div><a href="#fontes" className="source-link ground-source-link">como lemos o ponto terrestre <ArrowUpRight size={16} aria-hidden="true" /></a></section>
 
-      <section id="observar-hoje" className="today-observing-section" aria-labelledby="today-observing-title" data-testid="today-observation-panel" data-observation-state={todayObservation.tone}>
-        <div className="today-observing-heading"><p className="eyebrow"><Telescope size={15} aria-hidden="true" /> Plano de observação</p><h2 id="today-observing-title">Seu plano para <em>observar hoje.</em></h2><p>Uma leitura prática da próxima passagem da ISS, combinada com o estado do seu horizonte e do céu local.</p></div>
-        <div className={`today-observing-board today-observing-board--${todayObservation.tone}`}>
-          <div className="today-observing-board__header"><span className="today-observing-board__signal" aria-hidden="true" /><div><span>leitura para hoje</span><strong>{todayObservation.label}</strong></div>{userLocation && <small><MapPin size={13} aria-hidden="true" /> {userLocation.label}</small>}</div>
-          {!userLocation ? <div className="today-observing-board__empty"><h3>{todayObservation.headline}</h3><p>{todayObservation.detail}</p><button type="button" className="locate-button" onClick={requestLocation} disabled={isLocating}><LocateFixed size={17} aria-hidden="true" />{isLocating ? "localizando…" : "definir meu horizonte"}<ArrowUpRight size={16} aria-hidden="true" /></button></div> : <><div className="today-observing-board__summary"><h3>{todayObservation.headline}</h3><p>{todayObservation.detail}</p></div><div className="today-observing-grid"><article><span><Clock3 size={15} aria-hidden="true" /> melhor momento</span><strong>{prediction ? formatTimeFromNow(prediction.timestamp) : "em cálculo"}</strong><p>{prediction ? formatDate(prediction.timestamp) : "consultando a rota da ISS"}</p></article><article><span><Crosshair size={15} aria-hidden="true" /> aproximação</span><strong>{prediction ? `${formatNumber(prediction.distance)} km` : "—"}</strong><p>{prediction && proximityState ? "leitura favorável" : "distância da previsão"}</p></article><article><span><CloudSun size={15} aria-hidden="true" /> céu local</span><strong>{observingQuery.isError ? "indisponível" : skyReadout}</strong><p>{observingConditions?.cloudCover === null || observingConditions?.cloudCover === undefined ? "nuvens em leitura" : `${formatNumber(observingConditions.cloudCover)}% de nuvens · ${observingConditions.visibilityKm === null || observingConditions.visibilityKm === undefined ? "visibilidade em leitura" : `${formatNumber(observingConditions.visibilityKm, 1)} km`}`}</p></article></div><div className="today-observing-board__action"><div><span>orientação</span><p>{horizonGuidance}</p></div>{prediction && proximityState ? <PassAlertControl enabled={passAlertsEnabled} onToggle={togglePassAlert} /> : <button type="button" className="text-button" onClick={() => setSelectedSatellite("iss")}>focar a ISS no globo <ArrowUpRight size={16} aria-hidden="true" /></button>}</div><p className="today-observing-board__note">A direção e a elevação aparentes variam ao longo da passagem. Esta leitura não substitui uma previsão astronômica detalhada de trajeto no céu.</p></>}</div>
-      </section>
-
-      <section className="passage-section" aria-labelledby="passage-title"><div className="passage-art" aria-hidden="true"><img src="/manus-storage/iss-passage-panel_d049613e.svg" alt="" loading="lazy" decoding="async" /><div className="art-annotation annotation-one">linha de passagem</div><div className="art-annotation annotation-two">horizonte local</div></div><div className="passage-copy"><p className="eyebrow"><Sparkles size={15} aria-hidden="true" /> O seu horizonte</p><h2 id="passage-title">A próxima chance de ver a ISS começa pela sua cidade.</h2>{userLocation ? <div className="passage-result"><div className="location-line"><MapPin size={18} aria-hidden="true" /><span>{userLocation.label}</span></div>{selectedSatellite !== "iss" ? <p className="result-detail">A previsão local de passagem é calculada para a ISS. Selecione-a na constelação para consultar o seu horizonte.</p> : prediction ? <><p className={proximityState ? "result-status is-good" : "result-status"}>{proximityState ? "Boa aproximação prevista" : "Passagem mais próxima no período"}</p><strong className="passage-time">{formatTimeFromNow(prediction.timestamp)}</strong><p className="result-detail">A ISS deve passar a cerca de {formatNumber(prediction.distance)} km da sua posição, por volta de {formatDate(prediction.timestamp)}.</p>{proximityState && <PassAlertControl enabled={passAlertsEnabled} onToggle={togglePassAlert} />}</> : <p className="result-detail">Estamos consultando a rota das próximas duas horas.</p>}</div> : <div className="passage-empty"><p>Conte onde você está e calcularemos a aproximação mais promissora da ISS nas próximas duas horas.</p><button type="button" className="text-button" onClick={requestLocation}>definir meu horizonte <ArrowUpRight size={16} aria-hidden="true" /></button></div>}<p className="visibility-caveat">A observação a olho nu depende também da iluminação solar, da elevação e das condições de nuvens.</p></div></section>
+      <section className="passage-section" aria-labelledby="passage-title"><div className="passage-art" aria-hidden="true"><img src="/manus-storage/iss-passage-panel_d049613e.png" alt="" /><div className="art-annotation annotation-one">linha de passagem</div><div className="art-annotation annotation-two">horizonte local</div></div><div className="passage-copy"><p className="eyebrow"><Sparkles size={15} aria-hidden="true" /> O seu horizonte</p><h2 id="passage-title">A próxima chance de ver a ISS começa pela sua cidade.</h2>{userLocation ? <div className="passage-result"><div className="location-line"><MapPin size={18} aria-hidden="true" /><span>{userLocation.label}</span></div>{selectedSatellite !== "iss" ? <p className="result-detail">A previsão local de passagem é calculada para a ISS. Selecione-a na constelação para consultar o seu horizonte.</p> : prediction ? <><p className={proximityState ? "result-status is-good" : "result-status"}>{proximityState ? "Boa aproximação prevista" : "Passagem mais próxima no período"}</p><strong className="passage-time">{formatTimeFromNow(prediction.timestamp)}</strong><p className="result-detail">A ISS deve passar a cerca de {formatNumber(prediction.distance)} km da sua posição, por volta de {formatDate(prediction.timestamp)}.</p></> : <p className="result-detail">Estamos consultando a rota das próximas duas horas.</p>}</div> : <div className="passage-empty"><p>Conte onde você está e calcularemos a aproximação mais promissora da ISS nas próximas duas horas.</p><button type="button" className="text-button" onClick={requestLocation}>definir meu horizonte <ArrowUpRight size={16} aria-hidden="true" /></button></div>}<p className="visibility-caveat">A observação a olho nu depende também da iluminação solar, da elevação e das condições de nuvens.</p></div></section>
 
       <section className="sky-conditions-section" aria-labelledby="sky-title">
         <div className="sky-conditions-heading"><p className="eyebrow"><CloudSun size={15} aria-hidden="true" /> Janela de observação</p><h2 id="sky-title">O céu do seu horizonte.</h2><p>Depois de autorizar a localização, estimamos as condições que ajudam a planejar uma observação a olho nu.</p></div>
@@ -309,63 +238,62 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="launches-section" aria-labelledby="launches-title"><div className="launches-heading"><p className="eyebrow"><Rocket size={15} aria-hidden="true" /> Agenda espacial</p><h2 id="launches-title">Próximas partidas do planeta.</h2><a href="https://ll.thespacedevs.com/" target="_blank" rel="noreferrer">ver agenda completa <ArrowUpRight size={15} aria-hidden="true" /></a></div><div className="launch-list" aria-busy={launchesLoading}>{launchesLoading ? Array.from({ length: 3 }, (_, index) => <div key={index} className="launch-entry launch-skeleton" aria-hidden="true"><span className="launch-index">0{index + 1}</span><div><strong /><p /></div><time /></div>) : launchesQuery.data?.length ? launchesQuery.data.map((launch, index) => <a key={launch.id} href={launch.sourceUrl} target="_blank" rel="noreferrer" className="launch-entry"><span className="launch-index">0{index + 1}</span><div><strong>{launch.name}</strong><p>{launch.provider} · {launch.location}</p></div><time dateTime={launch.timestamp || undefined}>{launchDate(launch.timestamp)}<small>{launch.status}</small></time></a>) : <div className="launch-entry launch-loading"><span className="launch-index">—</span><div><strong>Agenda temporariamente indisponível</strong><p>A constelação e o horizonte continuam disponíveis.</p></div></div>}</div></section>
+      <section className="launches-section" aria-labelledby="launches-title"><div className="launches-heading"><p className="eyebrow"><Rocket size={15} aria-hidden="true" /> Agenda espacial</p><h2 id="launches-title">Próximas partidas do planeta.</h2><a href="https://ll.thespacedevs.com/" target="_blank" rel="noreferrer">ver agenda completa <ArrowUpRight size={15} aria-hidden="true" /></a></div><div className="launch-list">{launchesQuery.data?.length ? launchesQuery.data.map((launch, index) => <a key={launch.id} href={launch.sourceUrl} target="_blank" rel="noreferrer" className="launch-entry"><span className="launch-index">0{index + 1}</span><div><strong>{launch.name}</strong><p>{launch.provider} · {launch.location}</p></div><time dateTime={launch.timestamp || undefined}>{launchDate(launch.timestamp)}<small>{launch.status}</small></time></a>) : <div className="launch-entry launch-loading"><span className="launch-index">—</span><div><strong>{launchesQuery.isError ? "Agenda temporariamente indisponível" : "Carregando a agenda espacial…"}</strong><p>{launchesQuery.isError ? "A constelação e o horizonte continuam disponíveis." : "Consultando os próximos lançamentos públicos."}</p></div></div>}</div></section>
 
-      <section className={storyLoading ? "space-story-section is-loading" : "space-story-section"} aria-labelledby="story-title" aria-busy={storyLoading}><div className={spaceStory?.imageUrl ? "story-image has-image" : "story-image"} style={spaceStory?.imageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(7,17,31,.16), rgba(7,17,31,.72)), url(${spaceStory.imageUrl})` } : undefined}><span>arquivo do cosmos</span></div><div className="story-copy"><p className="eyebrow"><Telescope size={15} aria-hidden="true" /> Curiosidade de hoje</p><h2 id="story-title">{storyTitle}</h2><p>{storyExplanation}</p><div className="story-footer"><span>{spaceStory?.credit && !storyFailed ? `Crédito: ${spaceStory.credit}` : storyFailed ? "NASA Open APIs indisponível" : "Fonte: NASA Open APIs"}</span><a href={spaceStory?.sourceUrl || "https://api.nasa.gov/"} target="_blank" rel="noreferrer">ver fonte <ArrowUpRight size={14} aria-hidden="true" /></a></div></div></section>
+      <section className="space-story-section" aria-labelledby="story-title"><div className={storyQuery.data?.imageUrl ? "story-image has-image" : "story-image"} style={storyQuery.data?.imageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(7,17,31,.16), rgba(7,17,31,.72)), url(${storyQuery.data.imageUrl})` } : undefined}><span>arquivo do cosmos</span></div><div className="story-copy"><p className="eyebrow"><Telescope size={15} aria-hidden="true" /> Curiosidade de hoje</p><h2 id="story-title">{storyTitle}</h2><p>{storyExplanation}</p><div className="story-footer"><span>{storyQuery.data?.credit && !storyFailed ? `Crédito: ${storyQuery.data.credit}` : storyFailed ? "NASA Open APIs indisponível" : "Fonte: NASA Open APIs"}</span><a href={storyQuery.data?.sourceUrl || "https://api.nasa.gov/"} target="_blank" rel="noreferrer">ver fonte <ArrowUpRight size={14} aria-hidden="true" /></a></div></div></section>
 
-      <AdSlot placement="feed-mobile" />
-      <section id="fontes" className="context-section" aria-label="Fontes e limites do observatório"><div className="context-image"><img src="/manus-storage/iss-map-texture_2bd39705.svg" alt="Textura cartográfica da Terra vista da órbita" loading="lazy" decoding="async" /></div><div className="context-copy"><span className="section-index">01 — LEITURA DO CÉU</span><p>Dados de posição vêm de fontes públicas especializadas. Cidade e país indicam o subponto aproximado da órbita, e não uma confirmação de visibilidade local.</p></div><a href="/fontes" className="source-link">fontes, limites e privacidade <ArrowUpRight size={16} aria-hidden="true" /></a></section>
-      <footer className="site-footer" id="rodape">
-        <div className="footer-brand">
-          <a href="#inicio" className="footer-logo" aria-label="Órbita — voltar ao topo"><img src="/manus-storage/orbita-logo_99dcd0cb.svg" alt="" width="28" height="28" /><span>órbita</span></a>
-          <p className="footer-tagline">Um pequeno observatório orbital para grandes distâncias. Dados públicos de satélites traduzidos em leitura acessível.</p>
+      {/* ═══════════════════════════════════════════════════════
+          EPIC — Fotos diárias da Terra (DSCOVR satellite)
+      ═══════════════════════════════════════════════════════ */}
+      <section className="epic-section" aria-labelledby="epic-title">
+        <div className="epic-heading"><p className="eyebrow"><Globe size={15} aria-hidden="true" /> Terra em tempo real</p><h2 id="epic-title">A Terra fotografada do espaço profundo.</h2><p>Fotos diárias capturadas pela câmera EPIC a bordo do satélite DSCOVR, a 1,5 milhão de km da Terra.</p></div>
+        <div className="epic-gallery">
+          {epicQuery.data?.length ? epicQuery.data.map(image => (
+            <a key={image.id} href={image.imageUrl} target="_blank" rel="noreferrer" className="epic-card" aria-label={`Foto da Terra: ${image.caption}`}>
+              <img src={image.imageUrl} alt={image.caption} loading="lazy" decoding="async" />
+              <div className="epic-card-overlay"><span>{image.caption.slice(0, 60)}</span><small>{image.date}</small></div>
+            </a>
+          )) : <div className="epic-empty"><p>{epicQuery.isError ? "Galeria da Terra temporariamente indisponível" : "Carregando imagens da Terra…"}</p></div>}
         </div>
-        <nav className="footer-nav" aria-label="Navegação do rodapé">
-          <div className="footer-nav-group">
-            <span className="footer-nav-title">observatório</span>
-            <a href="#inicio">globo orbital</a>
-            <a href="#objeto">objeto em foco</a>
-            <a href="#telemetria">telemetria</a>
-            <a href="#passagem">previsão de passagem</a>
-          </div>
-          <div className="footer-nav-group">
-            <span className="footer-nav-title">curiosidades</span>
-            <a href="#lancamentos">agenda espacial</a>
-            <a href="#historia">curiosidade de hoje</a>
-            <a href="#condicoes">condições do céu</a>
-          </div>
-          <div className="footer-nav-group">
-            <span className="footer-nav-title">legal</span>
-            <a href="/privacidade">privacidade</a>
-            <a href="/termos">termos de uso</a>
-            <a href="/fontes">fontes e metodologia</a>
-            <button type="button" className="footer-text-btn" onClick={clearPreferences}>gerenciar cookies</button>
-          </div>
-        </nav>
-        <div className="footer-status">
-          <div className="footer-status-row">
-            <span className="footer-status-dot" aria-hidden="true" />
-            <span>{allSnapshots.length} objetos orbitais rastreados · foco: {selectedShortName}</span>
-          </div>
-          <div className="footer-status-row">
-            <span>Dados de CelesTrak, Open-Meteo, NASA APOD e TheSpaceDevs.</span>
-          </div>
-          <div className="footer-status-row footer-status-time">
-            <span>última atualização: {currentTime}</span>
-          </div>
+        <a href="https://epic.gsfc.nasa.gov/" target="_blank" rel="n noreferrer" className="epic-source">ver galeria completa no EPIC <ArrowUpRight size={14} aria-hidden="true" /></a>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════
+          DONKI — Clima Espacial (solar flares, CMEs, storms)
+      ═══════════════════════════════════════════════════════ */}
+      <section className="space-weather-section" aria-labelledby="weather-title">
+        <div className="weather-heading"><p className="eyebrow"><Flame size={15} aria-hidden="true" /> Clima espacial</p><h2 id="weather-title">O que o Sol está fazendo agora.</h2><p>Alertas de clima espacial da NASA: erupções solares, ejeções de massa coronal e tempestades geomagnéticas que afetam satélites e observação.</p></div>
+        <div className="weather-events">
+          {spaceWeatherQuery.data?.length ? spaceWeatherQuery.data.map(event => (
+            <article key={event.id} className="weather-event-card">
+              <div className="weather-event-type"><AlertTriangle size={14} aria-hidden="true" /><span>{event.typeLabel}</span></div>
+              <p className="weather-event-summary">{event.summary.slice(0, 180)}…</p>
+              <time dateTime={event.timestamp}>{new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(event.timestamp))}</time>
+            </article>
+          )) : <div className="weather-empty"><p>{spaceWeatherQuery.isError ? "Dados de clima espacial indisponíveis" : "Consultando o banco de dados de clima espacial da NASA…"}</p></div>}
         </div>
-        <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Órbita Observatório · projeto educativo de código aberto</span>
-          <a href="#inicio" className="footer-back-top" onClick={e => { e.preventDefault(); document.getElementById('inicio')?.scrollIntoView({ behavior: 'smooth' }); }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-            voltar ao topo
-          </a>
+        <a href="https://api.nasa.gov/" target="_blank" rel="noreferrer" className="weather-source">dados via NASA DONKI <ArrowUpRight size={14} aria-hidden="true" /></a>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════
+          Asteroides Próximos (NeoWs)
+      ═══════════════════════════════════════════════════════ */}
+      <section className="asteroids-section" aria-labelledby="asteroids-title">
+        <div className="asteroids-heading"><p className="eyebrow"><Crosshair size={15} aria-hidden="true" /> Objetos próximos</p><h2 id="asteroids-title">Asteroides passando perto da Terra.</h2><p>Dados do Near Earth Object Web Service da NASA — asteroides com passagem mais próxima nos próximos dias.</p></div>
+        <div className="asteroids-list">
+          {asteroidsQuery.data?.length ? asteroidsQuery.data.map(asteroid => (
+            <a key={asteroid.id} href={asteroid.nasaUrl} target="_blank" rel="noreferrer" className="asteroid-entry">
+              <span className="asteroid-hazard" data-hazard={asteroid.isHazardous}>{asteroid.isHazardous ? "⚠" : "○"}</span>
+              <div><strong>{asteroid.name}</strong><p>{formatNumber(asteroid.diameterKmMax * 1000, 1)} m · {formatNumber(asteroid.missDistanceKm)} km de distância</p></div>
+              <time dateTime={asteroid.approachDate}>{new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date(asteroid.approachDate))}<small>{formatNumber(asteroid.velocityKmh)} km/h</small></time>
+            </a>
+          )) : <div className="asteroid-loading"><p>{asteroidsQuery.isError ? "Lista de asteroides indisponível" : "Carregando asteroides próximos…"}</p></div>}
         </div>
-      </footer>
-      </div>
-      <aside className="ad-rail ad-rail--left"><div className="ad-rail__inner"><AdSlot placement="sidebar-left" /></div></aside>
-      <aside className="ad-rail ad-rail--right"><div className="ad-rail__inner"><AdSlot placement="sidebar-right" /></div></aside>
-      </div>
+        <a href="https://neo.jpl.nasa.gov/" target="_blank" rel="noreferrer" className="asteroids-source">explorar no JPL <ArrowUpRight size={14} aria-hidden="true" /></a>
+      </section>
+
+      <section id="fontes" className="context-section" aria-label="Fontes e limites do observatório"><div className="context-image"><img src="/manus-storage/iss-map-texture_2bd39705.png" alt="Textura cartográfica da Terra vista da órbita" /></div><div className="context-copy"><span className="section-index">01 — LEITURA DO CÉU</span><p>Dados de posição vêm de fontes públicas especializadas. Cidade e país indicam o subponto aproximado da órbita, e não uma confirmação de visibilidade local.</p></div><a href="/fontes" className="source-link">fontes, limites e privacidade <ArrowUpRight size={16} aria-hidden="true" /></a></section>
+      <footer className="site-footer"><span>Órbita — um pequeno observatório para grandes distâncias.</span><div className="footer-links"><a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/fontes">fontes</a></div><span>{allSnapshots.length} objetos · foco: {selectedShortName}</span></footer>
     </main>
   );
 }

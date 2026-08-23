@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getIssClosestPass, getObservingConditions, getOrbitSnapshot, getOrbitSnapshots, getSpaceStory, getUpcomingLaunches, resolveGroundLocation, SATELLITE_CATALOG } from "./orbitService";
+import { getEpicImages, getIssClosestPass, getNearEarthAsteroids, getObservingConditions, getOrbitSnapshot, getOrbitSnapshots, getSpaceStory, getSpaceWeather, getUpcomingLaunches, resolveGroundLocation, SATELLITE_CATALOG } from "./orbitService";
 import { isRateLimited } from "./security";
 
 const satelliteIdSchema = z.enum(["iss", "hubble", "tiangong", "noaa19"]);
@@ -13,7 +13,6 @@ const coordinateSchema = z.number().finite();
 const orbitPublicProcedure = publicProcedure.use(({ ctx, next }) => {
   const requestIdentity = ctx.req.ip || ctx.req.socket.remoteAddress || "anonymous";
   if (isRateLimited(requestIdentity)) {
-    ctx.res.setHeader("Retry-After", "60");
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Muitas consultas em pouco tempo. Aguarde um minuto para tentar novamente." });
   }
   return next();
@@ -22,7 +21,7 @@ const orbitPublicProcedure = publicProcedure.use(({ ctx, next }) => {
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(({ ctx }) => ctx.user ? ({ name: ctx.user.name, role: ctx.user.role }) : null),
+    me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -39,6 +38,9 @@ export const appRouter = router({
   space: router({
     story: orbitPublicProcedure.query(() => getSpaceStory()),
     launches: orbitPublicProcedure.query(() => getUpcomingLaunches()),
+    epic: orbitPublicProcedure.query(() => getEpicImages()),
+    weather: orbitPublicProcedure.query(() => getSpaceWeather()),
+    asteroids: orbitPublicProcedure.query(() => getNearEarthAsteroids()),
   }),
   observation: router({
     conditions: orbitPublicProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).query(({ input }) => getObservingConditions(input.latitude, input.longitude)),

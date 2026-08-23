@@ -108,32 +108,15 @@ export type OrbitSnapshot = {
   sourceUrl: string;
 };
 
-type CacheEntry<T> = { value: T; expiresAt: number; staleUntil: number };
+type CacheEntry<T> = { value: T; expiresAt: number };
 const cache = new Map<string, CacheEntry<unknown>>();
-const inFlight = new Map<string, Promise<unknown>>();
 
-async function withCache<T>(key: string, ttlMs: number, producer: () => Promise<T>, staleMs = Math.max(ttlMs * 4, 60_000)): Promise<T> {
+async function withCache<T>(key: string, ttlMs: number, producer: () => Promise<T>): Promise<T> {
   const cached = cache.get(key) as CacheEntry<T> | undefined;
-  const now = Date.now();
-  if (cached && cached.expiresAt > now) return cached.value;
-
-  const activeRequest = inFlight.get(key) as Promise<T> | undefined;
-  if (activeRequest) return activeRequest;
-
-  const request = producer()
-    .then(value => {
-      const storedAt = Date.now();
-      cache.set(key, { value, expiresAt: storedAt + ttlMs, staleUntil: storedAt + ttlMs + staleMs });
-      return value;
-    })
-    .catch(error => {
-      if (cached && cached.staleUntil > Date.now()) return cached.value;
-      throw error;
-    })
-    .finally(() => inFlight.delete(key));
-
-  inFlight.set(key, request as Promise<unknown>);
-  return request;
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const value = await producer();
+  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  return value;
 }
 
 async function fetchJson<T>(url: string, timeoutMs = 8000): Promise<T> {
@@ -192,14 +175,16 @@ async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): P
     const satrec = satellite.twoline2satrec(lines[1], lines[2]);
     const now = new Date();
     const propagated = satellite.propagate(satrec, now);
-    if (!propagated || !propagated.position || !propagated.velocity || typeof propagated.position === "boolean" || typeof propagated.velocity === "boolean") {
+    const pos = propagated.position;
+    const vel = propagated.velocity;
+    if (!pos || !vel || typeof pos === "boolean" || typeof vel === "boolean") {
       throw new Error("Não foi possível propagar a órbita selecionada.");
     }
 
     const gmst = satellite.gstime(now);
-    const geodetic = satellite.eciToGeodetic(propagated.position, gmst);
+    const geodetic = satellite.eciToGeodetic(pos, gmst);
     const velocity = Math.sqrt(
-      propagated.velocity.x ** 2 + propagated.velocity.y ** 2 + propagated.velocity.z ** 2,
+      vel.x ** 2 + vel.y ** 2 + vel.z ** 2,
     ) * 3600;
 
     return {
@@ -337,45 +322,187 @@ function safeNasaImage(url: string | undefined) {
   }
 }
 
-export type SpaceStory = {
-  title: string;
+export async function getSpaceStory() {
+  const dateKey = new Date().toISOString().slice(0, 10);
+  return withCache(`nasa:apod:${dateKey}`, 6 * 60 * 60_000, async () => {
+    const apiKey = process.env.NASA_API_KEY;
+    if (!apiKey) return null;
+    const data = await fetchJson<ApodProviderData>(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(apiKey)}`, 8000);
+    return {
+      title: data.title?.slice(0, 160) || "Imagem astronômica do dia",
+      date: data.date || dateKey,
+      explanation: data.explanation?.replace(/\s+/g, " ").trim().slice(0, 560) || "A NASA não forneceu uma explicação para esta entrada.",
+      imageUrl: data.media_type === "image" ? safeNasaImage(data.url) : null,
+      credit: data.copyright?.slice(0, 160) || "NASA",
+      sourceUrl: "https://api.nasa.gov/",
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// EPIC — Earth Polychromatic Imaging Camera (DSCOVR satellite)
+// ─────────────────────────────────────────────────────────────
+
+type EpicImage = {
+  identifier: string;
+  caption: string;
+  image: string;
+  version: string;
+  centroid_coordinates: { lat: number; lon: number };
+  dscovr_j2000_position: { x: number; y: number; z: number };
+  lunar_j2000_position: { x: number; y: number; z: number };
+  sun_j2000_position: { x: number; y: number; z: number };
+  attitud: { q0: number; q1: number; q2: number; q3: number };
+};
+
+export type EpicImageInfo = {
+  id: string;
+  caption: string;
+  imageUrl: string;
   date: string;
-  explanation: string;
-  imageUrl: string | null;
-  credit: string;
+  centroidLat: number;
+  centroidLon: number;
+};
+
+export async function getEpicImages(): Promise<EpicImageInfo[]> {
+  return withCache("nasa:epic:daily", 30 * 60_000, async () => {
+    const apiKey = process.env.NASA_API_KEY;
+    if (!apiKey) return [];
+    const data = await fetchJson<EpicImage[]>(
+      `https://api.nasa.gov/EPIC/api/natural/images?api_key=${encodeURIComponent(apiKey)}`,
+      10_000,
+    );
+    return (data || []).slice(0, 8).map(img => {
+      // identifier format: "20240115004831" → extract date parts
+      const id = img.identifier || "";
+      const year = id.slice(0, 4) || new Date().getFullYear().toString();
+      const month = id.slice(4, 6) || "01";
+      const day = id.slice(6, 8) || "01";
+      return {
+        id: img.identifier,
+        caption: img.caption?.slice(0, 200) || "Foto da Terra",
+        imageUrl: `https://epic.gsfc.nasa.gov/archive/natural/${year}/${month}/${day}/png/${img.image}.png`,
+        date: `${year}-${month}-${day}`,
+        centroidLat: img.centroid_coordinates?.lat ?? 0,
+        centroidLon: img.centroid_coordinates?.lon ?? 0,
+      };
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// DONKI — Space Weather Database Of Notifications
+// ─────────────────────────────────────────────────────────────
+
+type DonkiNotification = {
+  messageID: string;
+  message_type: string;
+  messageIssueTime: string;
+  messageBody: string;
+};
+
+export type SpaceWeatherEvent = {
+  id: string;
+  type: string;
+  typeLabel: string;
+  summary: string;
+  timestamp: string;
   sourceUrl: string;
 };
 
-let latestSpaceStory: SpaceStory | null = null;
-let nasaRetryAfter = 0;
+const DONKI_TYPE_LABELS: Record<string, string> = {
+  CME: "Ejeção de massa coronal",
+  "IPS": "Interferência de plasma",
+  GST: "Tempestade geomagnética",
+  "FLR": "Explosão solar",
+  "SEP": "Partículas solares energéticas",
+  MPC: "Microwaveburst",
+  NTE: "Evento de rádio terrestre",
+  RBE: "Emissão de rádio",
+};
 
-function isRateLimitError(error: unknown) {
-  return error instanceof Error && error.message.endsWith(": 429");
+export async function getSpaceWeather(): Promise<SpaceWeatherEvent[]> {
+  return withCache("nasa:donki", 30 * 60_000, async () => {
+    const apiKey = process.env.NASA_API_KEY;
+    if (!apiKey) return [];
+    const endDate = new Date().toISOString().slice(0, 10);
+    const startDate = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const data = await fetchJson<DonkiNotification[]>(
+      `https://api.nasa.gov/DONKI/api/v2/notifications?start_date=${startDate}&end_date=${endDate}&type=all&api_key=${encodeURIComponent(apiKey)}`,
+      12_000,
+    );
+    return (data || []).slice(0, 12).map(n => ({
+      id: n.messageID,
+      type: n.message_type,
+      typeLabel: DONKI_TYPE_LABELS[n.message_type] || n.message_type,
+      summary: n.messageBody?.replace(/\s+/g, " ").trim().slice(0, 280) || "Notificação de clima espacial",
+      timestamp: n.messageIssueTime || new Date().toISOString(),
+      sourceUrl: "https://api.nasa.gov/",
+    }));
+  });
 }
 
-export async function getSpaceStory(): Promise<SpaceStory | null> {
-  const dateKey = new Date().toISOString().slice(0, 10);
-  if (nasaRetryAfter > Date.now()) return latestSpaceStory;
+// ─────────────────────────────────────────────────────────────
+// NeoWs — Near Earth Object Web Service
+// ─────────────────────────────────────────────────────────────
 
-  try {
-    const story = await withCache(`nasa:apod:${dateKey}`, 6 * 60 * 60_000, async () => {
-      const apiKey = process.env.NASA_API_KEY;
-      if (!apiKey) return null;
-      const data = await fetchJson<ApodProviderData>(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(apiKey)}`, 8000);
-      return {
-        title: data.title?.slice(0, 160) || "Imagem astronômica do dia",
-        date: data.date || dateKey,
-        explanation: data.explanation?.replace(/\s+/g, " ").trim().slice(0, 560) || "A NASA não forneceu uma explicação para esta entrada.",
-        imageUrl: data.media_type === "image" ? safeNasaImage(data.url) : null,
-        credit: data.copyright?.slice(0, 160) || "NASA",
-        sourceUrl: "https://api.nasa.gov/",
-      };
-    });
-    latestSpaceStory = story;
-    return story;
-  } catch (error) {
-    if (isRateLimitError(error)) nasaRetryAfter = Date.now() + 15 * 60_000;
-    console.warn(`[NASA APOD] Fonte temporariamente indisponível${isRateLimitError(error) ? " (429)" : ""}.`);
-    return latestSpaceStory;
-  }
+type NeoFeedData = {
+  element_count: number;
+  near_earth_objects: Record<string, Array<{
+    id: string;
+    name: string;
+    nasa_jpl_url: string;
+    absolute_magnitude_h: number;
+    estimated_diameter: { kilometers: { estimated_diameter_min: number; estimated_diameter_max: number } };
+    is_potentially_hazardous_asteroid: boolean;
+    close_approach_data: Array<{
+      close_approach_date: string;
+      relative_velocity: { kilometers_per_hour: string };
+      miss_distance: { kilometers: string };
+    }>;
+  }>>;
+};
+
+export type NearEarthAsteroid = {
+  id: string;
+  name: string;
+  diameterKmMin: number;
+  diameterKmMax: number;
+  missDistanceKm: number;
+  velocityKmh: number;
+  approachDate: string;
+  isHazardous: boolean;
+  nasaUrl: string;
+};
+
+export async function getNearEarthAsteroids(): Promise<NearEarthAsteroid[]> {
+  return withCache("nasa:neo:feed", 60 * 60_000, async () => {
+    const apiKey = process.env.NASA_API_KEY;
+    if (!apiKey) return [];
+    const data = await fetchJson<NeoFeedData>(
+      `https://api.nasa.gov/neo/rest/v1/feed?api_key=${encodeURIComponent(apiKey)}`,
+      15_000,
+    );
+    const asteroids: NearEarthAsteroid[] = [];
+    for (const [, objects] of Object.entries(data.near_earth_objects || {})) {
+      for (const obj of objects) {
+        const approach = obj.close_approach_data?.[0];
+        if (!approach) continue;
+        asteroids.push({
+          id: obj.id,
+          name: obj.name?.replace(/[()]/g, "").trim() || "Asteróide",
+          diameterKmMin: obj.estimated_diameter?.kilometers?.estimated_diameter_min ?? 0,
+          diameterKmMax: obj.estimated_diameter?.kilometers?.estimated_diameter_max ?? 0,
+          missDistanceKm: parseFloat(approach.miss_distance?.kilometers || "0"),
+          velocityKmh: parseFloat(approach.relative_velocity?.kilometers_per_hour || "0"),
+          approachDate: approach.close_approach_date || new Date().toISOString().slice(0, 10),
+          isHazardous: obj.is_potentially_hazardous_asteroid || false,
+          nasaUrl: obj.nasa_jpl_url || "https://neo.jpl.nasa.gov/",
+        });
+      }
+    }
+    return asteroids
+      .sort((a, b) => a.missDistanceKm - b.missDistanceKm)
+      .slice(0, 10);
+  });
 }

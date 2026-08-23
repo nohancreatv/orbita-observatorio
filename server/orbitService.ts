@@ -325,8 +325,7 @@ function safeNasaImage(url: string | undefined) {
 export async function getSpaceStory() {
   const dateKey = new Date().toISOString().slice(0, 10);
   return withCache(`nasa:apod:${dateKey}`, 6 * 60 * 60_000, async () => {
-    const apiKey = process.env.NASA_API_KEY;
-    if (!apiKey) return null;
+    const apiKey = process.env.NASA_API_KEY || "DEMO_KEY";
     const data = await fetchJson<ApodProviderData>(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(apiKey)}`, 8000);
     return {
       title: data.title?.slice(0, 160) || "Imagem astronômica do dia",

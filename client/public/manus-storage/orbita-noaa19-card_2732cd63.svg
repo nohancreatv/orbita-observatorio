@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
-  <rect width="400" height="300" fill="#0a1628"/>
-  <circle cx="200" cy="150" r="80" fill="#0f2847" opacity="0.6"/>
-  <circle cx="200" cy="150" r="3.5" fill="#63e6be"/>
-  <line x1="175" y1="152" x2="225" y2="152" stroke="#6cb7d8" stroke-width="1" opacity="0.5"/>
-  <text x="200" y="220" text-anchor="middle" fill="#63e6be" font-family="system-ui,sans-serif" font-size="13" opacity="0.7">NOAA-19</text>
-  <text x="200" y="238" text-anchor="middle" fill="#6cb7d8" font-family="system-ui,sans-serif" font-size="10" opacity="0.4">NORAD 33591 · SSO · ~870 km</text>
-</svg>

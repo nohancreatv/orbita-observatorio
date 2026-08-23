@@ -110,10 +110,21 @@ function Atmosphere() {
   </mesh>;
 }
 
+/** Glow halo shader */
+function MarkerGlow() {
+  const material = useMemo(() => new ShaderMaterial({
+    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec2 vUv; void main() { float dist = length(vUv - vec2(0.5)); float glow = smoothstep(0.5, 0.0, dist); glow = pow(glow, 2.0); vec3 color = mix(vec3(0.99, 0.61, 0.43), vec3(1.0, 0.82, 0.62), glow); gl_FragColor = vec4(color, glow * 0.55); }`,
+    transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
+  }), []);
+  return <mesh material={material}><planeGeometry args={[0.28, 0.28]} /></mesh>;
+}
+
 function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Marker; active: boolean; transition: MarkerTransition; onSelect: (id: string) => void }) {
   const position = useMemo(() => toCartesian(marker.latitude, marker.longitude, 1.065), [marker.latitude, marker.longitude]);
   const outgoingRing = useRef<Group>(null);
   const incomingRing = useRef<Group>(null);
+  const glowRef = useRef<Group>(null);
   const isLeaving = transition.fromId === marker.id;
   const isEntering = transition.fromId !== null && transition.toId === marker.id;
 
@@ -205,7 +216,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
   const markerGeometry = JSON.stringify(markers.map(marker => ({ id: marker.id, latitude: marker.latitude, longitude: marker.longitude })));
   const isTransitioning = Boolean(markerTransition.fromId) && !reducedMotion;
   return <div className={`three-globe ${className}`} data-renderer="react-three-fiber" data-active-marker={selectedId} data-transition-from={markerTransition.fromId || ""} data-transition-to={markerTransition.toId} data-is-transitioning={isTransitioning} data-marker-count={markers.length} data-marker-geometry={markerGeometry} data-focus-longitude={selectedMarker?.longitude ?? 0} data-focus-duration={FOCUS_DURATION_MS} data-reduced-motion={reducedMotion} aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}>
-    <Canvas dpr={[1, 1.25]} frameloop={isTransitioning ? "always" : "demand"} camera={{ position: [0, 0, 3.2], fov: 38 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} fallback={<GlobeFallback />}>
+    <Canvas dpr={[1, 1.25]} frameloop="always" camera={{ position: [0, 0, 3.2], fov: 38 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }} fallback={<GlobeFallback />}>
       <Suspense fallback={null}><GlobeScene markers={markers} selectedId={selectedId} markerTransition={markerTransition} onSelect={onSelect} reducedMotion={reducedMotion} /></Suspense>
     </Canvas>
   </div>;

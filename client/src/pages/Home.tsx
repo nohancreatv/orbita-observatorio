@@ -315,7 +315,53 @@ export default function Home() {
 
       <AdSlot placement="feed-mobile" />
       <section id="fontes" className="context-section" aria-label="Fontes e limites do observatório"><div className="context-image"><img src="/manus-storage/iss-map-texture_2bd39705.svg" alt="Textura cartográfica da Terra vista da órbita" loading="lazy" decoding="async" /></div><div className="context-copy"><span className="section-index">01 — LEITURA DO CÉU</span><p>Dados de posição vêm de fontes públicas especializadas. Cidade e país indicam o subponto aproximado da órbita, e não uma confirmação de visibilidade local.</p></div><a href="/fontes" className="source-link">fontes, limites e privacidade <ArrowUpRight size={16} aria-hidden="true" /></a></section>
-      <footer className="site-footer"><span>Órbita — um pequeno observatório para grandes distâncias.</span><div className="footer-links"><a href="/privacidade">privacidade</a><button type="button" onClick={clearPreferences}>cookies</button><a href="/termos">termos</a><a href="/fontes">fontes</a></div><span>{allSnapshots.length} objetos · foco: {selectedShortName}</span></footer>
+      <footer className="site-footer" id="rodape">
+        <div className="footer-brand">
+          <a href="#inicio" className="footer-logo" aria-label="Órbita — voltar ao topo"><img src="/manus-storage/orbita-logo_99dcd0cb.svg" alt="" width="28" height="28" /><span>órbita</span></a>
+          <p className="footer-tagline">Um pequeno observatório orbital para grandes distâncias. Dados públicos de satélites traduzidos em leitura acessível.</p>
+        </div>
+        <nav className="footer-nav" aria-label="Navegação do rodapé">
+          <div className="footer-nav-group">
+            <span className="footer-nav-title">observatório</span>
+            <a href="#inicio">globo orbital</a>
+            <a href="#objeto">objeto em foco</a>
+            <a href="#telemetria">telemetria</a>
+            <a href="#passagem">previsão de passagem</a>
+          </div>
+          <div className="footer-nav-group">
+            <span className="footer-nav-title">curiosidades</span>
+            <a href="#lancamentos">agenda espacial</a>
+            <a href="#historia">curiosidade de hoje</a>
+            <a href="#condicoes">condições do céu</a>
+          </div>
+          <div className="footer-nav-group">
+            <span className="footer-nav-title">legal</span>
+            <a href="/privacidade">privacidade</a>
+            <a href="/termos">termos de uso</a>
+            <a href="/fontes">fontes e metodologia</a>
+            <button type="button" className="footer-text-btn" onClick={clearPreferences}>gerenciar cookies</button>
+          </div>
+        </nav>
+        <div className="footer-status">
+          <div className="footer-status-row">
+            <span className="footer-status-dot" aria-hidden="true" />
+            <span>{allSnapshots.length} objetos orbitais rastreados · foco: {selectedShortName}</span>
+          </div>
+          <div className="footer-status-row">
+            <span>Dados de CelesTrak, Open-Meteo, NASA APOD e TheSpaceDevs.</span>
+          </div>
+          <div className="footer-status-row footer-status-time">
+            <span>última atualização: {currentTime}</span>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© {new Date().getFullYear()} Órbita Observatório · projeto educativo de código aberto</span>
+          <a href="#inicio" className="footer-back-top" onClick={e => { e.preventDefault(); document.getElementById('inicio')?.scrollIntoView({ behavior: 'smooth' }); }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            voltar ao topo
+          </a>
+        </div>
+      </footer>
       </div>
       <aside className="ad-rail ad-rail--left"><div className="ad-rail__inner"><AdSlot placement="sidebar-left" /></div></aside>
       <aside className="ad-rail ad-rail--right"><div className="ad-rail__inner"><AdSlot placement="sidebar-right" /></div></aside>

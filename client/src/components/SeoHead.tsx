@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
-const SITE_ORIGIN = "https://isswatcher-8zu9asw5.manus.space";
-const DEFAULT_IMAGE = `${SITE_ORIGIN}/manus-storage/orbita-logo_99dcd0cb.png`;
+const SITE_ORIGIN = "https://satellite-now.netlify.app";
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-image.png`;
 
 type SeoHeadProps = { title: string; description: string; path: string; noIndex?: boolean };
 

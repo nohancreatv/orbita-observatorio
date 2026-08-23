@@ -20,12 +20,6 @@
 # Os ativos do projeto continuam no armazenamento gerenciado; o proxy evita
 # alterar URLs já publicadas e não leva segredos ao navegador.
 [[redirects]]
-  from = "/manus-storage/*"
-  to = "https://isswatcher-8zu9asw5.manus.space/manus-storage/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
   from = "/privacidade"
   to = "/index.html"
   status = 200

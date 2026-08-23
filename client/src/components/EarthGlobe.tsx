@@ -64,7 +64,7 @@ function useReducedMotion() {
 }
 
 // ─── Orbit Controls (manual, no drei dependency) ────────────────────────
-function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void }) {
+function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void }) { const onInteractRef = useRef(onInteract); useEffect(() => { onInteractRef.current = onInteract; }, [onInteract]);
   const { gl, camera } = useThree();
   const isDragging = useRef(false);
   const prevPointer = useRef({ x: 0, y: 0 });
@@ -80,7 +80,7 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
       autoRotate.current = false;
       prevPointer.current = { x: e.clientX, y: e.clientY };
       velocity.current = { x: 0, y: 0 };
-      onInteract?.();
+      onInteractRef.current?.();
     };
 
     const onPointerMove = (e: PointerEvent) => {
@@ -108,7 +108,7 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
         autoRotate.current = false;
         prevPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         velocity.current = { x: 0, y: 0 };
-        onInteract?.();
+        onInteractRef.current?.();
       }
     };
 
@@ -144,7 +144,7 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
       dom.removeEventListener("touchmove", onTouchMove);
       dom.removeEventListener("touchend", onTouchEnd);
     };
-  }, [gl, groupRef, onInteract]);
+  }, [gl, groupRef]);
 
   // Apply inertia + auto-rotate recovery
   useFrame(() => {
@@ -320,17 +320,17 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
   const group = useRef<Group>(null);
   const selected = markers.find(marker => marker.id === selectedId);
   const targetRotation = selected ? MathUtils.degToRad(-selected.longitude) : 0;
-  const transition = useRef({ from: 0, to: targetRotation, startedAt: 0 });
+  const transition = useRef({ from: targetRotation, to: targetRotation, startedAt: performance.now() });
   const invalidate = useThree(state => state.invalidate);
 
   useEffect(() => {
     if (!group.current) return;
-    transition.current = { from: group.current.rotation.y, to: targetRotation, startedAt: performance.now() };
+    const currentY = group.current.rotation.y;
+    transition.current = { from: currentY, to: targetRotation, startedAt: performance.now() };
   }, [targetRotation]);
 
   // Always render (fixes desktop animation)
   useFrame(() => {
-    invalidate();
     if (!group.current) return;
 
     // Smooth rotation to target satellite
@@ -338,6 +338,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
     if (elapsed < 1) {
       const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
       group.current.rotation.y = MathUtils.lerp(transition.current.from, transition.current.to, eased);
+      invalidate();
     }
 
     // Gentle auto-rotate when idle (very slow)

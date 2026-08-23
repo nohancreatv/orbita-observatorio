@@ -6,8 +6,8 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
-const SITE_ORIGIN = "https://isswatcher-8zu9asw5.manus.space";
-const DEFAULT_IMAGE = `${SITE_ORIGIN}/manus-storage/orbita-logo_99dcd0cb.png`;
+const SITE_ORIGIN = "https://satellite-now.netlify.app";
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/manus-storage/orbita-logo_99dcd0cb.svg`;
 
 type SeoMetadata = { title: string; description: string; path: string; noIndex?: boolean };
 

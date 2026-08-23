@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AdditiveBlending, BackSide, Color, DoubleSide, Group, MathUtils, MeshStandardMaterial, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector3 } from "three";
+import { AdditiveBlending, BackSide, Color, DoubleSide, Group, MathUtils, MeshStandardMaterial, ShaderMaterial, SRGBColorSpace, Texture, TextureLoader, Vector3 } from "three";
 
 const DAY_MAP = "/manus-storage/earth-day-atlas_ee47322f.jpg";
 const NIGHT_MAP = "/manus-storage/earth-night-atlas_06d895db.jpg";
@@ -63,14 +63,48 @@ function useReducedMotion() {
   return reducedMotion;
 }
 
+// ─── Safe Texture Loader ────────────────────────────────────────────────
+// Wraps useLoader with a try/catch so a failed texture doesn't crash the
+// entire canvas. Returns null when the texture can't be loaded.
+
+function useSafeTexture(url: string) {
+  const [texture, setTexture] = useState<Texture | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const loader = new TextureLoader();
+    let cancelled = false;
+    loader.load(
+      url,
+      (loaded) => {
+        if (cancelled) return;
+        loaded.colorSpace = SRGBColorSpace;
+        loaded.anisotropy = 2;
+        setTexture(loaded);
+      },
+      undefined,
+      () => {
+        if (cancelled) return;
+        console.warn(`[Globe] Failed to load texture: ${url}`);
+        setError(true);
+      },
+    );
+    return () => { cancelled = true; };
+  }, [url]);
+
+  return { texture, error };
+}
+
 // ─── Orbit Controls (manual, no drei dependency) ────────────────────────
-function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void }) { const onInteractRef = useRef(onInteract); useEffect(() => { onInteractRef.current = onInteract; }, [onInteract]);
-  const { gl, camera } = useThree();
+function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void }) {
+  const onInteractRef = useRef(onInteract);
+  useEffect(() => { onInteractRef.current = onInteract; }, [onInteract]);
+  const { gl } = useThree();
   const isDragging = useRef(false);
   const prevPointer = useRef({ x: 0, y: 0 });
   const velocity = useRef({ x: 0, y: 0 });
-  const spherical = useRef({ theta: 0, phi: Math.PI / 2 });
   const autoRotate = useRef(true);
+  const autoRotateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const dom = gl.domElement;
@@ -78,6 +112,7 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
     const onPointerDown = (e: PointerEvent) => {
       isDragging.current = true;
       autoRotate.current = false;
+      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
       prevPointer.current = { x: e.clientX, y: e.clientY };
       velocity.current = { x: 0, y: 0 };
       onInteractRef.current?.();
@@ -99,6 +134,8 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
 
     const onPointerUp = () => {
       isDragging.current = false;
+      // Resume auto-rotate after 4 seconds of inactivity
+      autoRotateTimer.current = setTimeout(() => { autoRotate.current = true; }, 4000);
     };
 
     // Touch support
@@ -106,6 +143,7 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
       if (e.touches.length === 1) {
         isDragging.current = true;
         autoRotate.current = false;
+        if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
         prevPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         velocity.current = { x: 0, y: 0 };
         onInteractRef.current?.();
@@ -127,7 +165,10 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
       );
     };
 
-    const onTouchEnd = () => { isDragging.current = false; };
+    const onTouchEnd = () => {
+      isDragging.current = false;
+      autoRotateTimer.current = setTimeout(() => { autoRotate.current = true; }, 4000);
+    };
 
     dom.addEventListener("pointerdown", onPointerDown);
     dom.addEventListener("pointermove", onPointerMove);
@@ -137,6 +178,7 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
     dom.addEventListener("touchend", onTouchEnd);
 
     return () => {
+      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
       dom.removeEventListener("pointerdown", onPointerDown);
       dom.removeEventListener("pointermove", onPointerMove);
       dom.removeEventListener("pointerup", onPointerUp);
@@ -163,40 +205,64 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
       );
     }
 
-    // Resume auto-rotate after 4 seconds of inactivity
-    if (!autoRotate.current && Math.abs(velocity.current.x) < 0.0001) {
-      autoRotate.current = true;
+    // Gentle auto-rotate when idle
+    if (autoRotate.current) {
+      groupRef.current.rotation.y += 0.0003;
     }
   });
 
   return null;
 }
 
-// ─── Globe Components ───────────────────────────────────────────────────
+// ─── Globe Components (with fallback materials) ─────────────────────────
+
 function EarthSurface() {
-  const [dayMap, nightMap] = useLoader(TextureLoader, [DAY_MAP, NIGHT_MAP]);
-  useMemo(() => {
-    [dayMap, nightMap].forEach(texture => {
-      texture.colorSpace = SRGBColorSpace;
-      texture.anisotropy = 2;
+  const { texture: dayMap, error: dayError } = useSafeTexture(DAY_MAP);
+  const { texture: nightMap, error: nightError } = useSafeTexture(NIGHT_MAP);
+
+  const material = useMemo(() => {
+    if (dayError && nightError) {
+      // Complete fallback: solid blue-green globe
+      return new MeshStandardMaterial({
+        color: new Color("#1a5276"),
+        emissive: new Color("#0a2a3f"),
+        emissiveIntensity: 0.3,
+        roughness: 0.8,
+        metalness: 0.05,
+      });
+    }
+    if (!dayMap || !nightMap) {
+      // Still loading — transparent placeholder
+      return new MeshStandardMaterial({ transparent: true, opacity: 0 });
+    }
+    return new MeshStandardMaterial({
+      map: dayMap,
+      emissiveMap: nightMap,
+      emissive: new Color("#193b58"),
+      emissiveIntensity: 0.36,
+      roughness: 0.76,
+      metalness: 0.04,
     });
-  }, [dayMap, nightMap]);
-  const material = useMemo(() => new MeshStandardMaterial({
-    map: dayMap, emissiveMap: nightMap, emissive: new Color("#193b58"),
-    emissiveIntensity: 0.36, roughness: 0.76, metalness: 0.04,
-  }), [dayMap, nightMap]);
-  return <mesh material={material} rotation={[0, -Math.PI / 2, 0]}>
-    <sphereGeometry args={[1, 56, 56]} />
-  </mesh>;
+  }, [dayMap, nightMap, dayError, nightError]);
+
+  return (
+    <mesh material={material} rotation={[0, -Math.PI / 2, 0]}>
+      <sphereGeometry args={[1, 56, 56]} />
+    </mesh>
+  );
 }
 
 function CloudLayer() {
-  const cloudMap = useLoader(TextureLoader, CLOUD_MAP);
-  useMemo(() => { cloudMap.colorSpace = SRGBColorSpace; cloudMap.anisotropy = 2; }, [cloudMap]);
-  return <mesh rotation={[0, -Math.PI / 2, 0]}>
-    <sphereGeometry args={[1.012, 44, 44]} />
-    <meshPhongMaterial map={cloudMap} transparent opacity={0.28} depthWrite={false} blending={AdditiveBlending} />
-  </mesh>;
+  const { texture: cloudMap, error: cloudError } = useSafeTexture(CLOUD_MAP);
+
+  if (cloudError || !cloudMap) return null;
+
+  return (
+    <mesh rotation={[0, -Math.PI / 2, 0]}>
+      <sphereGeometry args={[1.012, 44, 44]} />
+      <meshPhongMaterial map={cloudMap} transparent opacity={0.28} depthWrite={false} blending={AdditiveBlending} />
+    </mesh>
+  );
 }
 
 function Atmosphere() {
@@ -249,7 +315,6 @@ function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Mar
     }
   });
 
-  // Larger click target for better UX
   return <group position={position} onClick={event => { event.stopPropagation(); onSelect(marker.id); }}>
     {isLeaving && <group ref={outgoingRing}>
       <mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} side={DoubleSide} /></mesh>
@@ -290,24 +355,20 @@ function UserLocationMarker({ location }: { location: { latitude: number; longit
   });
 
   return <group position={position}>
-    {/* Pulsing ring */}
     <group ref={pulseRef}>
       <mesh>
         <ringGeometry args={[0.05, 0.065, 32]} />
         <meshBasicMaterial color="#4ade80" transparent opacity={0.8} side={DoubleSide} />
       </mesh>
     </group>
-    {/* Core dot */}
     <mesh>
       <sphereGeometry args={[0.028, 12, 12]} />
       <meshBasicMaterial color="#4ade80" />
     </mesh>
-    {/* White inner */}
     <mesh>
       <sphereGeometry args={[0.012, 8, 8]} />
       <meshBasicMaterial color="#f0fdf4" />
     </mesh>
-    {/* Beam pointing outward */}
     <mesh position={[0, 0, 0.04]}>
       <cylinderGeometry args={[0.003, 0.003, 0.08, 6]} />
       <meshBasicMaterial color="#4ade80" transparent opacity={0.5} />
@@ -329,24 +390,18 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
     transition.current = { from: currentY, to: targetRotation, startedAt: performance.now() };
   }, [targetRotation]);
 
-  // Always render (fixes desktop animation)
   useFrame(() => {
     if (!group.current) return;
 
-    // Smooth rotation to target satellite
     const elapsed = Math.min(1, (performance.now() - transition.current.startedAt) / FOCUS_DURATION_MS);
     if (elapsed < 1) {
       const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
       group.current.rotation.y = MathUtils.lerp(transition.current.from, transition.current.to, eased);
       invalidate();
     }
-
-    // Gentle auto-rotate when idle (very slow)
-    // Handled by OrbitControls
   });
 
   const handleInteract = useCallback(() => {
-    // Reset transition when user manually rotates
     if (group.current) {
       transition.current = { from: group.current.rotation.y, to: group.current.rotation.y, startedAt: performance.now() };
     }

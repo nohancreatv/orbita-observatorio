@@ -17,13 +17,7 @@
   status = 200
   force = true
 
-# Proxy para assets estáticos hospedados no armazenamento original.
-[[redirects]]
-  from = "/manus-storage/*"
-  to = "https://isswatcher-8zu9asw5.manus.space/manus-storage/:splat"
-  status = 200
-  force = true
-
+# SPA routes
 [[redirects]]
   from = "/privacidade"
   to = "/index.html"
@@ -47,7 +41,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://pagead2.googlesyndication.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.nasa.gov https://staticmap.openstreetmap.de https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://d36hbw14aib5lz.cloudfront.net https://isswatcher-8zu9asw5.manus.space; connect-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; frame-src https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; upgrade-insecure-requests"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://pagead2.googlesyndication.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.nasa.gov https://eoimages.gsfc.nasa.gov https://staticmap.openstreetmap.de https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://d36hbw14aib5lz.cloudfront.net; connect-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; frame-src https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com; upgrade-insecure-requests"
     Permissions-Policy = "geolocation=(self), camera=(), microphone=(), payment=(), usb=()"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"

@@ -18,7 +18,9 @@ export function registerStorageProxy(app: Express) {
     }
 
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      res.status(500).send("Storage proxy not configured");
+      // No backend storage configured — return 404 instead of redirecting to a dead domain.
+      // Static assets should be served from client/public/manus-storage/ via Vite/Netlify.
+      res.status(404).send("Asset not found locally");
       return;
     }
 

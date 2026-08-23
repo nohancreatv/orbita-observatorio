@@ -271,7 +271,7 @@ export default function Home() {
         <div className="orbital-stage multi-orbit-stage" aria-label={`Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais`}>
           <img src="/manus-storage/iss-hero-earth_dc590d13.png" alt="Terra vista do espaço" className="hero-earth-art" decoding="async" fetchPriority="high" />
           <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
-          {shouldLoadGlobe ? <Suspense fallback={<GlobeFallback />}><EarthGlobe markers={globeMarkers} selectedId={selectedSatellite} onSelect={id => setSelectedSatellite(id as SatelliteId)} className="three-globe-interactive" /></Suspense> : <GlobeFallback />}
+          {shouldLoadGlobe ? <Suspense fallback={<GlobeFallback />}><EarthGlobe markers={globeMarkers} selectedId={selectedSatellite} onSelect={id => setSelectedSatellite(id as SatelliteId)} userLocation={userLocation} className="three-globe-interactive" /></Suspense> : <GlobeFallback />}
           <div className="globe-badge globe-badge-wide"><div className="badge-icon"><Crosshair size={17} aria-hidden="true" /></div><div><span>{selectedShortName} agora</span><strong>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "sincronizando coordenadas"}</strong><small><MapPin size={11} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização terrestre em leitura"}</small></div></div>
           <div className="orbit-caption orbit-caption-bottom"><span /> foco: {selectedShortName}</div>
         </div>

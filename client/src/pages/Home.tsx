@@ -92,6 +92,16 @@ export default function Home() {
   const spaceWeatherQuery = trpc.space.weather.useQuery(undefined, { staleTime: 30 * 60_000, retry: 1 });
   const asteroidsQuery = trpc.space.asteroids.useQuery(undefined, { staleTime: 60 * 60_000, retry: 1 });
 
+  // Consulta a imagem do local baseada nas coordenadas do satélite
+  const placeImageInput = useMemo(() => 
+    snapshot ? { latitude: snapshot.latitude, longitude: snapshot.longitude } : null,
+    [snapshot]
+  );
+  const placeImageQuery = trpc.space.placeImage.useQuery(
+    placeImageInput!,
+    { enabled: Boolean(placeImageInput), staleTime: 30 * 60_000, retry: 1 }
+  );
+
   useEffect(() => {
     const interval = window.setInterval(() => setClock(new Date()), 1000);
     return () => window.clearInterval(interval);
@@ -149,7 +159,8 @@ export default function Home() {
   const centerLongitude = snapshot?.longitude || 0;
   const centerLatitude = snapshot?.latitude || 0;
   const selectedImage = OBJECT_IMAGES[selectedSatellite];
-  const groundPortraitUrl = snapshot ? `https://staticmap.openstreetmap.de/staticmap.php?center=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude}`)}&zoom=4&size=520x320&maptype=mapnik&markers=${encodeURIComponent(`${snapshot.latitude},${snapshot.longitude},orange-pushpin`)}` : "/manus-storage/iss-map-texture_2bd39705.png";
+  // URL da imagem do local: usa Google Maps/ArcGIS se disponível, senão fallback
+  const groundPortraitUrl = placeImageQuery.data || "/manus-storage/iss-map-texture_2bd39705.png";
   const currentTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(clock);
   const proximityState = prediction && prediction.distance < 2500;
   const previewStoryFailure = import.meta.env.DEV && new URLSearchParams(window.location.search).has("simular-falha-nasa");

@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getEpicImages, getIssClosestPass, getNearEarthAsteroids, getObservingConditions, getOrbitSnapshot, getOrbitSnapshots, getSpaceStory, getSpaceWeather, getUpcomingLaunches, resolveGroundLocation, SATELLITE_CATALOG } from "./orbitService";
+import { getEpicImages, getIssClosestPass, getNearEarthAsteroids, getObservingConditions, getOrbitSnapshot, getOrbitSnapshots, getPlaceImage, getSpaceStory, getSpaceWeather, getUpcomingLaunches, resolveGroundLocation, SATELLITE_CATALOG } from "./orbitService";
 import { isRateLimited } from "./security";
 
 const satelliteIdSchema = z.enum(["iss", "hubble", "tiangong", "noaa19"]);
@@ -41,6 +41,9 @@ export const appRouter = router({
     epic: orbitPublicProcedure.query(() => getEpicImages()),
     weather: orbitPublicProcedure.query(() => getSpaceWeather()),
     asteroids: orbitPublicProcedure.query(() => getNearEarthAsteroids()),
+    placeImage: orbitPublicProcedure
+      .input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) }))
+      .query(({ input }) => getPlaceImage(input.latitude, input.longitude)),
   }),
   observation: router({
     conditions: orbitPublicProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).query(({ input }) => getObservingConditions(input.latitude, input.longitude)),

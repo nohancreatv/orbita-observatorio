@@ -506,3 +506,27 @@ export async function getNearEarthAsteroids(): Promise<NearEarthAsteroid[]> {
       .slice(0, 10);
   });
 }
+
+/**
+ * Gera URL de imagem estática do local usando Google Maps Static API (satélite)
+ * ou ArcGIS World Imagery como fallback gratuito.
+ */
+export async function getPlaceImage(latitude: number, longitude: number): Promise<string> {
+  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
+  
+  if (googleKey) {
+    // Google Maps Static API - visualização satélite
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=6&size=520x320&maptype=satellite&key=${encodeURIComponent(googleKey)}`;
+  }
+  
+  // Fallback gratuito: ArcGIS World Imagery
+  // Calcula bounding box ao redor das coordenadas
+  const deltaLat = 3;
+  const deltaLng = 5;
+  const south = Math.max(-90, latitude - deltaLat);
+  const north = Math.min(90, latitude + deltaLat);
+  const west = Math.max(-180, longitude - deltaLng);
+  const east = Math.min(180, longitude + deltaLng);
+  
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${west},${south},${east},${north}&bboxSR=4326&size=520,320&imageSR=4326&format=jpg&f=image`;
+}

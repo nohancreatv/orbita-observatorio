@@ -108,15 +108,32 @@ export type OrbitSnapshot = {
   sourceUrl: string;
 };
 
-type CacheEntry<T> = { value: T; expiresAt: number };
+type CacheEntry<T> = { value: T; expiresAt: number; staleUntil: number };
 const cache = new Map<string, CacheEntry<unknown>>();
+const inFlight = new Map<string, Promise<unknown>>();
 
-async function withCache<T>(key: string, ttlMs: number, producer: () => Promise<T>): Promise<T> {
+async function withCache<T>(key: string, ttlMs: number, producer: () => Promise<T>, staleMs = Math.max(ttlMs * 4, 60_000)): Promise<T> {
   const cached = cache.get(key) as CacheEntry<T> | undefined;
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const value = await producer();
-  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
-  return value;
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const activeRequest = inFlight.get(key) as Promise<T> | undefined;
+  if (activeRequest) return activeRequest;
+
+  const request = producer()
+    .then(value => {
+      const storedAt = Date.now();
+      cache.set(key, { value, expiresAt: storedAt + ttlMs, staleUntil: storedAt + ttlMs + staleMs });
+      return value;
+    })
+    .catch(error => {
+      if (cached && cached.staleUntil > Date.now()) return cached.value;
+      throw error;
+    })
+    .finally(() => inFlight.delete(key));
+
+  inFlight.set(key, request as Promise<unknown>);
+  return request;
 }
 
 async function fetchJson<T>(url: string, timeoutMs = 8000): Promise<T> {
@@ -322,20 +339,46 @@ function safeNasaImage(url: string | undefined) {
   }
 }
 
-export async function getSpaceStory() {
+export type SpaceStory = {
+  title: string;
+  date: string;
+  explanation: string;
+  imageUrl: string | null;
+  credit: string;
+  sourceUrl: string;
+};
+
+let latestSpaceStory: SpaceStory | null = null;
+let nasaRetryAfter = 0;
+
+function isRateLimitError(error: unknown) {
+  return error instanceof Error && (error.message.endsWith(": 429") || error.message.includes("429"));
+}
+
+export async function getSpaceStory(): Promise<SpaceStory | null> {
   const dateKey = new Date().toISOString().slice(0, 10);
-  return withCache(`nasa:apod:${dateKey}`, 6 * 60 * 60_000, async () => {
-    const apiKey = process.env.NASA_API_KEY || "DEMO_KEY";
-    const data = await fetchJson<ApodProviderData>(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(apiKey)}`, 8000);
-    return {
-      title: data.title?.slice(0, 160) || "Imagem astronômica do dia",
-      date: data.date || dateKey,
-      explanation: data.explanation?.replace(/\s+/g, " ").trim().slice(0, 560) || "A NASA não forneceu uma explicação para esta entrada.",
-      imageUrl: data.media_type === "image" ? safeNasaImage(data.url) : null,
-      credit: data.copyright?.slice(0, 160) || "NASA",
-      sourceUrl: "https://api.nasa.gov/",
-    };
-  });
+  if (nasaRetryAfter > Date.now()) return latestSpaceStory;
+
+  try {
+    const story = await withCache(`nasa:apod:${dateKey}`, 6 * 60 * 60_000, async () => {
+      const apiKey = process.env.NASA_API_KEY || "DEMO_KEY";
+      const data = await fetchJson<ApodProviderData>(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(apiKey)}`, 8000);
+      return {
+        title: data.title?.slice(0, 160) || "Imagem astronômica do dia",
+        date: data.date || dateKey,
+        explanation: data.explanation?.replace(/\s+/g, " ").trim().slice(0, 560) || "A NASA não forneceu uma explicação para esta entrada.",
+        imageUrl: data.media_type === "image" ? safeNasaImage(data.url) : null,
+        credit: data.copyright?.slice(0, 160) || "NASA",
+        sourceUrl: "https://api.nasa.gov/",
+      };
+    });
+    latestSpaceStory = story;
+    return story;
+  } catch (error) {
+    if (isRateLimitError(error)) nasaRetryAfter = Date.now() + 15 * 60_000;
+    console.warn(`[NASA APOD] Fonte temporariamente indisponível${isRateLimitError(error) ? " (429)" : ""}.`);
+    return latestSpaceStory;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

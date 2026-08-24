@@ -13,7 +13,7 @@ export const productionSecurityHeaders: RequestHandler = (req, res, next) => {
     "script-src 'self' https://pagead2.googlesyndication.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://*.nasa.gov https://eoimages.gsfc.nasa.gov https://staticmap.openstreetmap.de https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://d36hbw14aib5lz.cloudfront.net",
+    "img-src 'self' data: https://*.nasa.gov https://eoimages.gsfc.nasa.gov https://staticmap.openstreetmap.de https://server.arcgisonline.com https://maps.googleapis.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://d36hbw14aib5lz.cloudfront.net",
     "connect-src 'self' https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
     "frame-src https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
     "upgrade-insecure-requests",

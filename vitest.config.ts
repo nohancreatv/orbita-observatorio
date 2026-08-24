@@ -14,6 +14,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    env: {
+      NASA_API_KEY: process.env.NASA_API_KEY ?? "DEMO_KEY",
+      VITE_ADSENSE_PUBLISHER_ID: process.env.VITE_ADSENSE_PUBLISHER_ID ?? "ca-pub-5884730150482896",
+    },
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "client/src/**/*.test.ts", "client/src/**/*.spec.ts"],
   },
 });

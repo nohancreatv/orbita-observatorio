@@ -7,9 +7,7 @@ import {
   Crosshair,
   CloudSun,
   Eye,
-  Globe,
   Gauge,
-  AlertTriangle,
   LocateFixed,
   MapPin,
   Orbit,
@@ -20,11 +18,10 @@ import {
   Satellite,
   Sparkles,
   Telescope,
-  Flame,
 } from "lucide-react";
 import type { AppRouter } from "../../../server/routers";
+import { EarthGlobe } from "@/components/EarthGlobe";
 import { trpc } from "@/lib/trpc";
-import { focusRotation, markerClassName, normaliseLongitude, projectOnGlobe } from "@/lib/orbitVisual";
 import "../multi-orbit.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -88,9 +85,6 @@ export default function Home() {
   const satellites = catalogQuery.data || [];
   const observingInput = useMemo(() => userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : { latitude: 0, longitude: 0 }, [userLocation]);
   const observingQuery = trpc.observation.conditions.useQuery(observingInput, { enabled: Boolean(userLocation), staleTime: 15 * 60_000, retry: 1 });
-  const epicQuery = trpc.space.epic.useQuery(undefined, { staleTime: 30 * 60_000, retry: 1 });
-  const spaceWeatherQuery = trpc.space.weather.useQuery(undefined, { staleTime: 30 * 60_000, retry: 1 });
-  const asteroidsQuery = trpc.space.asteroids.useQuery(undefined, { staleTime: 60 * 60_000, retry: 1 });
 
   // Consulta a imagem do local baseada nas coordenadas do satélite
   const placeImageInput = useMemo(() => 
@@ -170,8 +164,7 @@ export default function Home() {
   const observingConditions = observingQuery.data;
   const skyReadout = observingConditions?.cloudCover === null || observingConditions?.cloudCover === undefined ? "céu em leitura" : observingConditions.cloudCover < 25 ? "céu favorável" : observingConditions.cloudCover < 60 ? "nuvens variáveis" : "céu encoberto";
   const launchDate = (value: string | null | undefined) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "horário a confirmar";
-  const selectedProjection = snapshot ? projectOnGlobe(snapshot.latitude, snapshot.longitude, centerLongitude) : null;
-  const globeStyle = { "--globe-rotation": focusRotation(centerLongitude), "--focus-latitude": `${centerLatitude}` } as React.CSSProperties;
+  const globeMarkers = useMemo(() => allSnapshots.map(item => ({ id: item.satellite.id, shortName: item.satellite.shortName, name: item.satellite.name, latitude: item.latitude, longitude: item.longitude })), [allSnapshots]);
 
   return (
     <main className="observatory-shell">
@@ -199,26 +192,13 @@ export default function Home() {
         <div className="orbital-stage multi-orbit-stage" aria-label={`Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais`}>
           <img src="/manus-storage/iss-hero-earth_dc590d13.jpg" alt="Terra vista do espaço" className="hero-earth-art" />
           <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
-          <div className="globe-frame globe-frame-interactive" style={globeStyle}>
-            <div className="globe-ocean" aria-hidden="true" />
-            <div className="globe-map-overlay" aria-hidden="true" />
-            <div className="globe-relief" aria-hidden="true" />
-            <div className="globe-clouds globe-clouds-one" aria-hidden="true" />
-            <div className="globe-clouds globe-clouds-two" aria-hidden="true" />
-            <div className="globe-grid globe-grid-longitude" aria-hidden="true" />
-            <div className="globe-grid globe-grid-latitude" aria-hidden="true" />
-            <div className="globe-terminator" aria-hidden="true" />
-            <div className="globe-equator" aria-hidden="true" />
-            <div className="orbital-path orbital-path-one" aria-hidden="true" />
-            <div className="orbital-path orbital-path-two" aria-hidden="true" />
-            {allSnapshots.map(item => {
-              const point = projectOnGlobe(item.latitude, item.longitude, centerLongitude);
-              const active = item.satellite.id === selectedSatellite;
-              return <button key={item.satellite.id} type="button" onClick={() => setSelectedSatellite(item.satellite.id as SatelliteId)} className={markerClassName(item.satellite.id, selectedSatellite)} style={{ left: point.left, top: point.top, opacity: point.opacity, transform: `translate(-50%, -50%) scale(${point.scale})` }} aria-label={`Focar ${item.satellite.name}`} aria-pressed={active}><span className="marker-halo" /><Satellite size={active ? 16 : 12} strokeWidth={active ? 2.5 : 2} /><span className="marker-label">{item.satellite.shortName}</span></button>;
-            })}
-            {selectedProjection && <div className="focus-reticle" style={{ left: selectedProjection.left, top: selectedProjection.top }} aria-hidden="true"><span /><span /></div>}
-            <div className="globe-scale-label globe-scale-north">90° N</div><div className="globe-scale-label globe-scale-equator">equador</div><div className="globe-scale-label globe-scale-south">90° S</div>
-          </div>
+          <EarthGlobe
+            markers={globeMarkers}
+            selectedId={selectedSatellite}
+            onSelect={id => setSelectedSatellite(id as SatelliteId)}
+            className="three-globe-interactive"
+            userLocation={userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : null}
+          />
           <div className="globe-badge globe-badge-wide"><div className="badge-icon"><Crosshair size={17} aria-hidden="true" /></div><div><span>{selectedShortName} agora</span><strong>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "sincronizando coordenadas"}</strong><small><MapPin size={11} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização terrestre em leitura"}</small></div></div>
           <div className="orbit-caption orbit-caption-bottom"><span /> foco: {selectedShortName}</div>
         </div>
@@ -227,7 +207,7 @@ export default function Home() {
       <section className="object-focus-section" aria-labelledby="object-focus-title">
         <div className="object-focus-image"><img src={selectedImage} alt={`Imagem orbital de ${selectedName}`} /><div className="object-image-caption">imagem de referência · {selectedShortName}</div></div>
         <div className="object-focus-copy"><p className="eyebrow"><Crosshair size={15} aria-hidden="true" /> Objeto em foco</p><h2 id="object-focus-title">{selectedName}</h2><p>{snapshot?.satellite.category || "Objeto orbital"} · NORAD {snapshot?.satellite.noradId || "—"}. Ao selecionar outro marcador, o globo percorre a longitude correspondente e preserva todos os demais objetos na mesma leitura.</p><div className="object-focus-data"><span><MapPin size={14} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização em leitura"}</span><span><Orbit size={14} aria-hidden="true" /> {getVisibilityCopy(snapshot?.visibility)}</span></div></div>
-        <aside className="object-ground-portrait"><img src={groundPortraitUrl} alt={snapshot ? `Mapa do ponto suborbital de ${selectedName} em ${snapshot.groundLocation.label}` : "Mapa do ponto suborbital em leitura"} onError={event => { event.currentTarget.src = "/manus-storage/iss-map-texture_2bd39705.jpg"; }} /><div className="ground-portrait-overlay"><span>retrato terrestre</span><strong>{snapshot?.groundLocation.label || "localização em leitura"}</strong><small>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</small><a href={snapshot?.sourceUrl || "/fontes"} target={snapshot?.sourceUrl ? "_blank" : undefined} rel="noreferrer">fonte orbital <ArrowUpRight size={13} aria-hidden="true" /></a></div></aside>
+        <aside className="object-ground-portrait"><img src={groundPortraitUrl} alt={snapshot ? `Mapa do ponto suborbital de ${selectedName} em ${snapshot.groundLocation.label}` : "Mapa do ponto suborbital em leitura"} onError={event => { event.currentTarget.src = "/manus-storage/iss-map-texture_2bd39705.jpg"; }} /><div className="ground-portrait-overlay"><span className="ground-portrait-details">retrato da superfície terrestre</span><strong>{snapshot?.groundLocation.label || "localização em leitura"}</strong><small>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</small><a href={snapshot?.sourceUrl || "/fontes"} target={snapshot?.sourceUrl ? "_blank" : undefined} rel="noreferrer">fonte orbital <ArrowUpRight size={13} aria-hidden="true" /></a></div></aside>
       </section>
 
       <section className="telemetry-strip" aria-label={`Telemetria atual de ${selectedShortName}`}>
@@ -252,56 +232,6 @@ export default function Home() {
       <section className="launches-section" aria-labelledby="launches-title"><div className="launches-heading"><p className="eyebrow"><Rocket size={15} aria-hidden="true" /> Agenda espacial</p><h2 id="launches-title">Próximas partidas do planeta.</h2><a href="https://ll.thespacedevs.com/" target="_blank" rel="noreferrer">ver agenda completa <ArrowUpRight size={15} aria-hidden="true" /></a></div><div className="launch-list">{launchesQuery.data?.length ? launchesQuery.data.map((launch, index) => <a key={launch.id} href={launch.sourceUrl} target="_blank" rel="noreferrer" className="launch-entry"><span className="launch-index">0{index + 1}</span><div><strong>{launch.name}</strong><p>{launch.provider} · {launch.location}</p></div><time dateTime={launch.timestamp || undefined}>{launchDate(launch.timestamp)}<small>{launch.status}</small></time></a>) : <div className="launch-entry launch-loading"><span className="launch-index">—</span><div><strong>{launchesQuery.isError ? "Agenda temporariamente indisponível" : "Carregando a agenda espacial…"}</strong><p>{launchesQuery.isError ? "A constelação e o horizonte continuam disponíveis." : "Consultando os próximos lançamentos públicos."}</p></div></div>}</div></section>
 
       <section className="space-story-section" aria-labelledby="story-title"><div className={storyQuery.data?.imageUrl ? "story-image has-image" : "story-image"} style={storyQuery.data?.imageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(7,17,31,.16), rgba(7,17,31,.72)), url(${storyQuery.data.imageUrl})` } : undefined}><span>arquivo do cosmos</span></div><div className="story-copy"><p className="eyebrow"><Telescope size={15} aria-hidden="true" /> Curiosidade de hoje</p><h2 id="story-title">{storyTitle}</h2><p>{storyExplanation}</p><div className="story-footer"><span>{storyQuery.data?.credit && !storyFailed ? `Crédito: ${storyQuery.data.credit}` : storyFailed ? "NASA Open APIs indisponível" : "Fonte: NASA Open APIs"}</span><a href={storyQuery.data?.sourceUrl || "https://api.nasa.gov/"} target="_blank" rel="noreferrer">ver fonte <ArrowUpRight size={14} aria-hidden="true" /></a></div></div></section>
-
-      {/* ═══════════════════════════════════════════════════════
-          EPIC — Fotos diárias da Terra (DSCOVR satellite)
-      ═══════════════════════════════════════════════════════ */}
-      <section className="epic-section" aria-labelledby="epic-title">
-        <div className="epic-heading"><p className="eyebrow"><Globe size={15} aria-hidden="true" /> Terra em tempo real</p><h2 id="epic-title">A Terra fotografada do espaço profundo.</h2><p>Fotos diárias capturadas pela câmera EPIC a bordo do satélite DSCOVR, a 1,5 milhão de km da Terra.</p></div>
-        <div className="epic-gallery">
-          {epicQuery.data?.length ? epicQuery.data.map(image => (
-            <a key={image.id} href={image.imageUrl} target="_blank" rel="noreferrer" className="epic-card" aria-label={`Foto da Terra: ${image.caption}`}>
-              <img src={image.imageUrl} alt={image.caption} loading="lazy" decoding="async" />
-              <div className="epic-card-overlay"><span>{image.caption.slice(0, 60)}</span><small>{image.date}</small></div>
-            </a>
-          )) : <div className="epic-empty"><p>{epicQuery.isError ? "Galeria da Terra temporariamente indisponível" : "Carregando imagens da Terra…"}</p></div>}
-        </div>
-        <a href="https://epic.gsfc.nasa.gov/" target="_blank" rel="n noreferrer" className="epic-source">ver galeria completa no EPIC <ArrowUpRight size={14} aria-hidden="true" /></a>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════
-          DONKI — Clima Espacial (solar flares, CMEs, storms)
-      ═══════════════════════════════════════════════════════ */}
-      <section className="space-weather-section" aria-labelledby="weather-title">
-        <div className="weather-heading"><p className="eyebrow"><Flame size={15} aria-hidden="true" /> Clima espacial</p><h2 id="weather-title">O que o Sol está fazendo agora.</h2><p>Alertas de clima espacial da NASA: erupções solares, ejeções de massa coronal e tempestades geomagnéticas que afetam satélites e observação.</p></div>
-        <div className="weather-events">
-          {spaceWeatherQuery.data?.length ? spaceWeatherQuery.data.map(event => (
-            <article key={event.id} className="weather-event-card">
-              <div className="weather-event-type"><AlertTriangle size={14} aria-hidden="true" /><span>{event.typeLabel}</span></div>
-              <p className="weather-event-summary">{event.summary.slice(0, 180)}…</p>
-              <time dateTime={event.timestamp}>{new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(event.timestamp))}</time>
-            </article>
-          )) : <div className="weather-empty"><p>{spaceWeatherQuery.isError ? "Dados de clima espacial indisponíveis" : "Consultando o banco de dados de clima espacial da NASA…"}</p></div>}
-        </div>
-        <a href="https://api.nasa.gov/" target="_blank" rel="noreferrer" className="weather-source">dados via NASA DONKI <ArrowUpRight size={14} aria-hidden="true" /></a>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════
-          Asteroides Próximos (NeoWs)
-      ═══════════════════════════════════════════════════════ */}
-      <section className="asteroids-section" aria-labelledby="asteroids-title">
-        <div className="asteroids-heading"><p className="eyebrow"><Crosshair size={15} aria-hidden="true" /> Objetos próximos</p><h2 id="asteroids-title">Asteroides passando perto da Terra.</h2><p>Dados do Near Earth Object Web Service da NASA — asteroides com passagem mais próxima nos próximos dias.</p></div>
-        <div className="asteroids-list">
-          {asteroidsQuery.data?.length ? asteroidsQuery.data.map(asteroid => (
-            <a key={asteroid.id} href={asteroid.nasaUrl} target="_blank" rel="noreferrer" className="asteroid-entry">
-              <span className="asteroid-hazard" data-hazard={asteroid.isHazardous}>{asteroid.isHazardous ? "⚠" : "○"}</span>
-              <div><strong>{asteroid.name}</strong><p>{formatNumber(asteroid.diameterKmMax * 1000, 1)} m · {formatNumber(asteroid.missDistanceKm)} km de distância</p></div>
-              <time dateTime={asteroid.approachDate}>{new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date(asteroid.approachDate))}<small>{formatNumber(asteroid.velocityKmh)} km/h</small></time>
-            </a>
-          )) : <div className="asteroid-loading"><p>{asteroidsQuery.isError ? "Lista de asteroides indisponível" : "Carregando asteroides próximos…"}</p></div>}
-        </div>
-        <a href="https://neo.jpl.nasa.gov/" target="_blank" rel="noreferrer" className="asteroids-source">explorar no JPL <ArrowUpRight size={14} aria-hidden="true" /></a>
-      </section>
 
       <section id="fontes" className="context-section" aria-label="Fontes e limites do observatório"><div className="context-image">          <img src="/manus-storage/iss-map-texture_2bd39705.jpg" alt="Textura cartográfica da Terra vista da órbita" /></div><div className="context-copy"><span className="section-index">01 — LEITURA DO CÉU</span><p>Dados de posição vêm de fontes públicas especializadas. Cidade e país indicam o subponto aproximado da órbita, e não uma confirmação de visibilidade local.</p></div><a href="/fontes" className="source-link">fontes, limites e privacidade <ArrowUpRight size={16} aria-hidden="true" /></a></section>
       <footer className="site-footer">

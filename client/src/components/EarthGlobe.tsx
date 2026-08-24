@@ -405,7 +405,7 @@ function GlobeFallback() {
 }
 
 // ─── Export ─────────────────────────────────────────────────────────────
-export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "" }: EarthGlobeProps) {
+export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "", userLocation }: EarthGlobeProps) {
   const selectedMarker = markers.find(m => m.id === selectedId);
   const reducedMotion = useReducedMotion();
   const previousSelectedId = useRef(selectedId);
@@ -453,6 +453,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
             markerTransition={markerTransition}
             onSelect={onSelect}
             reducedMotion={reducedMotion}
+            userLocation={userLocation}
           />
         </Suspense>
       </Canvas>

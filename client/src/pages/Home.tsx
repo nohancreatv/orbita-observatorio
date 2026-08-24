@@ -236,12 +236,13 @@ export default function Home() {
       <section id="fontes" className="context-section" aria-label="Fontes e limites do observatório"><div className="context-image">          <img src="/manus-storage/iss-map-texture_2bd39705.jpg" alt="Textura cartográfica da Terra vista da órbita" /></div><div className="context-copy"><span className="section-index">01 — LEITURA DO CÉU</span><p>Dados de posição vêm de fontes públicas especializadas. Cidade e país indicam o subponto aproximado da órbita, e não uma confirmação de visibilidade local.</p></div><a href="/fontes" className="source-link">fontes, limites e privacidade <ArrowUpRight size={16} aria-hidden="true" /></a></section>
       <footer className="site-footer">
         <div className="footer-grid">
-          <div className="footer-col footer-brand">
-            <a href="#inicio" className="brand-mark" aria-label="Órbita, início"><img src="/manus-storage/orbita-logo_99dcd0cb.svg" alt="" className="brand-symbol" /><span>órbita</span></a>
+          <div className="footer-brand">
+            <a href="#inicio" className="footer-logo" aria-label="Órbita, início"><img src="/manus-storage/orbita-logo_99dcd0cb.svg" alt="" /><span>órbita</span></a>
             <p className="footer-tagline">Um pequeno observatório para grandes distâncias. Dados orbitais públicos transformados em experiência visual.</p>
           </div>
-          <div className="footer-col">
-            <h3 className="footer-heading">Observatório</h3>
+          <div className="footer-nav">
+            <div className="footer-nav-group">
+              <span className="footer-nav-title">Observatório</span>
             <nav aria-label="Navegação do observatório">
               <a href="#inicio">globo orbital</a>
               <a href="#objeto">objeto em foco</a>
@@ -249,29 +250,30 @@ export default function Home() {
               <a href="#passagem">próxima passagem</a>
             </nav>
           </div>
-          <div className="footer-col">
-            <h3 className="footer-heading">Curiosidades</h3>
+          <div className="footer-nav-group">
+            <span className="footer-nav-title">Curiosidades</span>
             <nav aria-label="Curiosidades e dados">
               <a href="#lançamentos">próximos lançamentos</a>
               <a href="#curiosidade">curiosidade do dia</a>
               <a href="#condicoes">condições do céu</a>
             </nav>
           </div>
-          <div className="footer-col">
-            <h3 className="footer-heading">Legal</h3>
+          <div className="footer-nav-group">
+            <span className="footer-nav-title">Legal</span>
             <nav aria-label="Links legais">
               <a href="/privacidade">privacidade</a>
               <a href="/termos">termos de uso</a>
               <a href="/fontes">fontes e limites</a>
             </nav>
           </div>
+          </div>
         </div>
         <div className="footer-status">
-          <div className="footer-status-left">
-            <span className="signal-dot" aria-hidden="true" />
+          <div className="footer-status-row">
+            <span className="footer-status-dot" aria-hidden="true" />
             <span>ao vivo · {allSnapshots.length} objetos rastreados</span>
           </div>
-          <div className="footer-status-right">
+          <div className="footer-status-row">
             <span>foco: {selectedShortName}</span>
             <span className="meta-divider" />
             <span>fontes: NASA · CelesTrak · Open-Meteo · The Space Devs</span>
@@ -279,7 +281,7 @@ export default function Home() {
         </div>
         <div className="footer-bottom">
           <span>© {new Date().getFullYear()} Órbita Observatório · dados públicos, código aberto</span>
-          <a href="#inicio" className="back-to-top" aria-label="Voltar ao topo">↑ voltar ao topo</a>
+          <a href="#inicio" className="footer-back-top" aria-label="Voltar ao topo">↑ voltar ao topo</a>
         </div>
       </footer>
     </main>

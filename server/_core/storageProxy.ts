@@ -10,7 +10,7 @@ export function isSafeStorageKey(key: string) {
 }
 
 export function registerStorageProxy(app: Express) {
-  app.get("/manus-storage/*", async (req, res) => {
+  app.get("/manus-storage/*", async (req, res, next) => {
     const key = (req.params as Record<string, string>)[0];
     if (!key || !isSafeStorageKey(key)) {
       res.status(400).send("Invalid storage key");
@@ -18,10 +18,8 @@ export function registerStorageProxy(app: Express) {
     }
 
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      // No backend storage configured — return 404 instead of redirecting to a dead domain.
-      // Static assets should be served from client/public/manus-storage/ via Vite/Netlify.
-      res.status(404).send("Asset not found locally");
-      return;
+      // Nenhum storage remoto configurado — permite que o Vite ou o express.static sirvam de client/public/manus-storage/
+      return next();
     }
 
     try {

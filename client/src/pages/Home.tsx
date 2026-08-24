@@ -176,7 +176,7 @@ export default function Home() {
     <main className="observatory-shell">
       <div className="star-surface" aria-hidden="true" />
       <header className="site-header">
-        <a href="#inicio" className="brand-mark" aria-label="Órbita, início"><img src="/manus-storage/orbita-logo_99dcd0cb.png" alt="" className="brand-symbol" /><span>órbita</span></a>
+        <a href="#inicio" className="brand-mark" aria-label="Órbita, início"><img src="/manus-storage/orbita-logo_99dcd0cb.svg" alt="" className="brand-symbol" /><span>órbita</span></a>
         <div className="header-meta"><span className="signal-dot" aria-hidden="true" /><span>observatório orbital</span><span className="meta-divider" /><time dateTime={clock.toISOString()}>{currentTime} local</time></div>
       </header>
 

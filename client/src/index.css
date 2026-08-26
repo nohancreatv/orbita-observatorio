@@ -632,3 +632,31 @@
   max-width: 100%;
   max-height: 100%;
 }
+
+
+/* Camada cartográfica: rótulos de países sobre a imagem de satélite. */
+.object-ground-portrait > img:first-child {
+  position: relative;
+  z-index: 0;
+}
+
+.object-ground-portrait > img.ground-portrait-labels {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: none;
+  opacity: .88;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.object-ground-portrait::after {
+  z-index: 2;
+}
+
+.ground-portrait-overlay {
+  z-index: 3;
+}

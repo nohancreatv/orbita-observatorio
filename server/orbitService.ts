@@ -576,26 +576,55 @@ export async function getNearEarthAsteroids(): Promise<NearEarthAsteroid[]> {
   });
 }
 
-/**
- * Gera URL de imagem estática do local usando Google Maps Static API (satélite)
- * ou ArcGIS World Imagery como fallback gratuito.
- */
-export async function getPlaceImage(latitude: number, longitude: number): Promise<string> {
-  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
-  
-  if (googleKey) {
-    // Google Maps Static API - visualização satélite
-    return `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=6&size=520x320&maptype=satellite&key=${encodeURIComponent(googleKey)}`;
-  }
-  
-  // Fallback gratuito: ArcGIS World Imagery
-  // Calcula bounding box ao redor das coordenadas
+export type PlaceImage = {
+  imageUrl: string;
+  labelsUrl: string | null;
+  provider: "Google Maps" | "ArcGIS World Imagery";
+  attribution: string;
+  attributionUrl: string;
+};
+
+function arcGisExportUrl(service: string, latitude: number, longitude: number, format: "jpg" | "png", transparent: boolean) {
   const deltaLat = 3;
   const deltaLng = 5;
   const south = Math.max(-90, latitude - deltaLat);
   const north = Math.min(90, latitude + deltaLat);
   const west = Math.max(-180, longitude - deltaLng);
   const east = Math.min(180, longitude + deltaLng);
-  
-  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${west},${south},${east},${north}&bboxSR=4326&size=520,320&imageSR=4326&format=jpg&f=image`;
+  const url = new URL(`https://server.arcgisonline.com/ArcGIS/rest/services/${service}/export`);
+  url.searchParams.set("bbox", `${west},${south},${east},${north}`);
+  url.searchParams.set("bboxSR", "4326");
+  url.searchParams.set("size", "520,320");
+  url.searchParams.set("imageSR", "4326");
+  url.searchParams.set("format", format);
+  url.searchParams.set("transparent", String(transparent));
+  url.searchParams.set("f", "image");
+  return url.toString();
+}
+
+/**
+ * Gera a imagem terrestre em duas camadas: satélite e rótulos geográficos.
+ * Sem chave, usa os endpoints públicos do ArcGIS World Imagery e World
+ * Boundaries and Places; o cliente empilha a camada transparente sobre a base.
+ */
+export async function getPlaceImage(latitude: number, longitude: number): Promise<PlaceImage> {
+  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
+
+  if (googleKey) {
+    return {
+      imageUrl: `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=6&size=520x320&maptype=satellite&key=${encodeURIComponent(googleKey)}`,
+      labelsUrl: null,
+      provider: "Google Maps",
+      attribution: "© Google Maps",
+      attributionUrl: "https://developers.google.com/maps/documentation/maps-static/overview",
+    };
+  }
+
+  return {
+    imageUrl: arcGisExportUrl("World_Imagery/MapServer", latitude, longitude, "jpg", false),
+    labelsUrl: arcGisExportUrl("Reference/World_Boundaries_and_Places/MapServer", latitude, longitude, "png", true),
+    provider: "ArcGIS World Imagery",
+    attribution: "© Esri · World Imagery · World Boundaries and Places",
+    attributionUrl: "https://www.esri.com/en-us/legal/terms/data-attributions",
+  };
 }

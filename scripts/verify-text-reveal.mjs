@@ -21,11 +21,16 @@ try {
       window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" });
     });
     await page.waitForTimeout(700);
-    const afterScroll = await page.evaluate(() => ({
-      revealCount: document.querySelectorAll(".text-reveal").length,
-      visibleCount: document.querySelectorAll(".text-reveal.is-visible").length,
-      telemetryAnimated: Boolean(document.querySelector(".telemetry-strip.text-reveal")),
-    }));
+    const afterScroll = await page.evaluate(() => {
+      const reveals = [...document.querySelectorAll(".text-reveal")];
+      const children = reveals.flatMap(element => [...element.children]);
+      return {
+        revealCount: reveals.length,
+        visibleCount: reveals.filter(element => element.classList.contains("is-visible")).length,
+        childStates: children.map(element => ({ opacity: window.getComputedStyle(element).opacity, transform: window.getComputedStyle(element).transform, clipPath: window.getComputedStyle(element).clipPath })),
+        telemetryAnimated: Boolean(document.querySelector(".telemetry-strip.text-reveal")),
+      };
+    });
     regularResults.push({ route, aboveFold, afterScroll });
     await page.close();
   }
@@ -46,7 +51,7 @@ try {
   }
   await reduced.close();
 
-  const allRegularValid = regularResults.every(({ afterScroll }) => afterScroll.revealCount > 0 && afterScroll.visibleCount === afterScroll.revealCount && !afterScroll.telemetryAnimated);
+  const allRegularValid = regularResults.every(({ afterScroll }) => afterScroll.revealCount > 0 && afterScroll.visibleCount === afterScroll.revealCount && afterScroll.childStates.every(item => item.opacity === "1" && item.transform !== "none") && !afterScroll.telemetryAnimated);
   const allReducedValid = reducedResults.every(({ result }) => result.length > 0 && result.every(item => item.opacity === "1" && item.transform === "none"));
   if (!allRegularValid || !allReducedValid) throw new Error(JSON.stringify({ regularResults, reducedResults }));
   console.log(JSON.stringify({ verification: "passed", regularResults, reducedResults }, null, 2));

@@ -11,8 +11,8 @@ const CLOUD_MAP = "/assets/earth-clouds-atlas_8c506c86.png";
 const FOCUS_DURATION_MS = 500;
 const ROTATION_SENSITIVITY = 0.006;
 const INERTIA_DAMPING = 0.93;
-const AUTO_ROTATE_SPEED = 0.00085;
-const AUTO_ROTATE_DELAY_MS = 4000;
+const AUTO_ROTATE_SPEED = 0.0016;
+const AUTO_ROTATE_DELAY_MS = 900;
 const MAX_TILT = Math.PI / 3;
 
 // ─── Shaders ───────────────────────────────────────────────────────────
@@ -417,12 +417,13 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
 //   innerGroup ← geographic focus transition (latitude/longitude)
 // During a selection, the outer group returns to neutral so the selected marker
 // cannot inherit a previous drag/auto-rotation offset.
-function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition }) {
+function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion, onRotationFrame }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition; onRotationFrame?: (rotationY: number) => void }) {
   const outerGroup = useRef<Group>(null);
   const innerGroup = useRef<Group>(null);
   const selected = markers.find(m => m.id === selectedId);
   const targetRotation = selected ? getGlobeFocusRotation(selected.latitude, selected.longitude) : { rotationX: 0, rotationY: 0 };
   const transition = useRef({ fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, outerFromX: 0, outerFromY: 0, outerToX: 0, outerToY: 0, startedAt: 0 });
+  const rotationProbeAt = useRef(0);
   const invalidate = useThree(state => state.invalidate);
 
   useEffect(() => {
@@ -453,12 +454,22 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
   useFrame(() => {
     if (!innerGroup.current || !outerGroup.current) return;
     const elapsed = Math.min(1, (performance.now() - transition.current.startedAt) / FOCUS_DURATION_MS);
-    if (elapsed >= 1) return;
+    if (elapsed >= 1) {
+      if (onRotationFrame && performance.now() - rotationProbeAt.current >= 120) {
+        rotationProbeAt.current = performance.now();
+        onRotationFrame(outerGroup.current.rotation.y);
+      }
+      return;
+    }
     const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
     innerGroup.current.rotation.x = MathUtils.lerp(transition.current.fromX, transition.current.toX, eased);
     innerGroup.current.rotation.y = MathUtils.lerp(transition.current.fromY, transition.current.toY, eased);
     outerGroup.current.rotation.x = MathUtils.lerp(transition.current.outerFromX, transition.current.outerToX, eased);
     outerGroup.current.rotation.y = MathUtils.lerp(transition.current.outerFromY, transition.current.outerToY, eased);
+    if (onRotationFrame && performance.now() - rotationProbeAt.current >= 120) {
+      rotationProbeAt.current = performance.now();
+      onRotationFrame(outerGroup.current.rotation.y);
+    }
     if (elapsed < 1) invalidate();
   });
 
@@ -509,6 +520,7 @@ function GlobeFallback() {
 // ─── Export ─────────────────────────────────────────────────────────────
 export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "", userLocation }: EarthGlobeProps) {
   const selectedMarker = markers.find(m => m.id === selectedId);
+  const globeElementRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
   const previousSelectedId = useRef(selectedId);
   const [markerTransition, setMarkerTransition] = useState<MarkerTransition>({ fromId: null, toId: selectedId, startedAt: 0 });
@@ -525,11 +537,16 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
 
   const markerGeometry = JSON.stringify(markers.map(m => ({ id: m.id, latitude: m.latitude, longitude: m.longitude })));
   const isTransitioning = Boolean(markerTransition.fromId) && !reducedMotion;
+  const handleRotationFrame = useCallback((rotationY: number) => {
+    globeElementRef.current?.setAttribute("data-rotation-y", rotationY.toFixed(6));
+  }, []);
 
   return (
     <div
+      ref={globeElementRef}
       className={`three-globe ${className}`}
       data-renderer="react-three-fiber"
+      data-auto-rotate="true"
       data-active-marker={selectedId}
       data-transition-from={markerTransition.fromId || ""}
       data-transition-to={markerTransition.toId}
@@ -559,6 +576,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
             onSelect={onSelect}
             reducedMotion={reducedMotion}
             userLocation={userLocation}
+            onRotationFrame={handleRotationFrame}
           />
         </Suspense>
       </Canvas>

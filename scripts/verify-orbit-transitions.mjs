@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium", args: ["--no-sandbox"] });
+const baseUrl = process.env.BASE_URL || "http://localhost:3000/";
 const mobileMode = process.env.E2E_MOBILE === "1";
 const page = await browser.newPage({ viewport: mobileMode ? { width: 390, height: 844 } : { width: 1280, height: 720 } });
 const sequence = [
@@ -11,7 +12,7 @@ const sequence = [
 ];
 
 try {
-  await page.goto("http://localhost:3000/", { waitUntil: "domcontentloaded" });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".three-globe canvas", { timeout: 20_000 });
   await page.waitForFunction(() => document.querySelector(".three-globe")?.getAttribute("data-active-marker") === "iss", undefined, { timeout: 12_000 });
 

@@ -1,12 +1,13 @@
 import { chromium } from "playwright";
 
 const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const baseUrl = process.env.BASE_URL || "http://localhost:3000/";
 const mobileMode = process.env.E2E_MOBILE === "1";
 const page = await browser.newPage({ viewport: mobileMode ? { width: 390, height: 844 } : { width: 1280, height: 720 } });
 if (process.env.E2E_REDUCED_MOTION === "1") await page.emulateMedia({ reducedMotion: "reduce" });
 
 try {
-  await page.goto("http://localhost:3000/", { waitUntil: "domcontentloaded" });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".three-globe canvas", { timeout: 25_000 });
   await page.waitForFunction(() => document.querySelector(".three-globe")?.getAttribute("data-renderer") === "react-three-fiber", undefined, { timeout: 25_000 });
 

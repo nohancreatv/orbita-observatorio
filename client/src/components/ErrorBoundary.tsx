@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Component, ReactNode } from "react";
+import { TextReveal } from "@/components/TextReveal";
 
 interface Props {
   children: ReactNode;
@@ -29,7 +30,7 @@ class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <main className="flex items-center justify-center min-h-screen p-8 bg-background" role="alert">
-          <div className="flex flex-col items-center w-full max-w-xl p-8 text-center">
+          <TextReveal as="div" className="flex flex-col items-center w-full max-w-xl p-8 text-center" delay={40}>
             <AlertTriangle
               size={48}
               className="text-destructive mb-6 flex-shrink-0"
@@ -46,7 +47,7 @@ class ErrorBoundary extends Component<Props, State> {
               <RotateCcw size={16} />
               recarregar observatório
             </button>
-          </div>
+          </TextReveal>
         </main>
       );
     }

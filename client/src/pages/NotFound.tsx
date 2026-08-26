@@ -1,12 +1,13 @@
 import { useLocation } from "wouter";
 import { AlertCircle, Home } from "lucide-react";
+import { TextReveal } from "@/components/TextReveal";
 
 export default function NotFound() {
   const [, setLocation] = useLocation();
 
   return (
     <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #07111f, #0a1d2e)" }}>
-      <div style={{ textAlign: "center", maxWidth: 480, padding: "0 24px" }}>
+      <TextReveal as="div" delay={40} style={{ textAlign: "center", maxWidth: 480, padding: "0 24px" }}>
         <div style={{ marginBottom: 28, display: "flex", justifyContent: "center" }}>
           <div style={{ position: "relative" }}>
             <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(255,179,141,.12)", animation: "active-radar 1.8s ease-out infinite" }} />
@@ -27,7 +28,7 @@ export default function NotFound() {
         >
           <Home size={15} /> voltar ao observatório
         </button>
-      </div>
+      </TextReveal>
     </main>
   );
 }

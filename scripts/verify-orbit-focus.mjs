@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
 const mobileMode = process.env.E2E_MOBILE === "1";
 const page = await browser.newPage({ viewport: mobileMode ? { width: 390, height: 844 } : { width: 1280, height: 720 } });
 if (process.env.E2E_REDUCED_MOTION === "1") await page.emulateMedia({ reducedMotion: "reduce" });

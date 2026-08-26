@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getGlobeFocusRotation } from "@/lib/globeFocus";
+import { getGlobeFocusRotation, getShortestRotationTarget } from "@/lib/globeFocus";
 import type { Texture } from "three";
 import { AdditiveBlending, BackSide, Color, DoubleSide, Group, MathUtils, MeshStandardMaterial, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector3 } from "three";
 
@@ -234,7 +234,7 @@ function UserLocationMarker({ location }: { location: { latitude: number; longit
 // ─── Orbit Controls ────────────────────────────────────────────────────
 // Manages the OUTER group: drag, inertia, auto-rotate.
 // Independent from satellite focus transition.
-function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void }) {
+function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void; focusActive?: boolean }) {
   const onInteractRef = useRef(onInteract);
   useEffect(() => { onInteractRef.current = onInteract; }, [onInteract]);
   const { gl } = useThree();
@@ -243,6 +243,7 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
   const velocity = useRef({ x: 0, y: 0 });
   const autoRotate = useRef(true);
   const autoRotateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasFocusActive = useRef(false);
 
   useEffect(() => {
     const dom = gl.domElement;
@@ -323,10 +324,23 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
     };
   }, [gl, groupRef]);
 
+  useEffect(() => {
+    if (focusActive) {
+      wasFocusActive.current = true;
+      autoRotate.current = false;
+      velocity.current = { x: 0, y: 0 };
+      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+      return;
+    }
+    if (!wasFocusActive.current) return;
+    wasFocusActive.current = false;
+    autoRotateTimer.current = setTimeout(() => { autoRotate.current = true; }, AUTO_ROTATE_DELAY_MS);
+  }, [focusActive]);
+
   // Inertia + auto-rotate every frame on the OUTER group
   useFrame(() => {
     if (!groupRef.current) return;
-    if (isDragging.current) return;
+    if (focusActive || isDragging.current) return;
 
     if (!autoRotate.current && (Math.abs(velocity.current.x) > 0.0001 || Math.abs(velocity.current.y) > 0.0001)) {
       velocity.current.x *= INERTIA_DAMPING;
@@ -347,39 +361,52 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
 }
 
 // ─── Globe Scene ───────────────────────────────────────────────────────
-// TWO nested groups to prevent rotation conflicts:
-//   outerGroup ← OrbitControls (drag, inertia, auto-rotate)
-//   innerGroup ← satellite focus transition (lerp to latitude/longitude)
+// TWO nested groups with explicit focus normalization:
+//   outerGroup ← drag, inertia, auto-rotate and accumulated orientation
+//   innerGroup ← geographic focus transition (latitude/longitude)
+// During a selection, the outer group returns to neutral so the selected marker
+// cannot inherit a previous drag/auto-rotation offset.
 function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition }) {
   const outerGroup = useRef<Group>(null);
   const innerGroup = useRef<Group>(null);
   const selected = markers.find(m => m.id === selectedId);
   const targetRotation = selected ? getGlobeFocusRotation(selected.latitude, selected.longitude) : { rotationX: 0, rotationY: 0 };
-  const transition = useRef({ fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, startedAt: 0 });
+  const transition = useRef({ fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, outerFromX: 0, outerFromY: 0, outerToX: 0, outerToY: 0, startedAt: 0 });
   const invalidate = useThree(state => state.invalidate);
 
   useEffect(() => {
     if (!innerGroup.current) return;
     const currentX = innerGroup.current.rotation.x;
     const currentY = innerGroup.current.rotation.y;
+    const outerCurrentX = outerGroup.current?.rotation.x || 0;
+    const outerCurrentY = outerGroup.current?.rotation.y || 0;
+    if (reducedMotion) {
+      innerGroup.current.rotation.set(targetRotation.rotationX, targetRotation.rotationY, 0);
+      outerGroup.current?.rotation.set(0, 0, 0);
+      return;
+    }
     transition.current = {
       fromX: currentX,
       fromY: currentY,
       toX: targetRotation.rotationX,
       toY: targetRotation.rotationY,
+      outerFromX: outerCurrentX,
+      outerFromY: outerCurrentY,
+      outerToX: 0,
+      outerToY: getShortestRotationTarget(outerCurrentY, 0),
       startedAt: performance.now(),
     };
-  }, [targetRotation.rotationX, targetRotation.rotationY]);
+  }, [targetRotation.rotationX, targetRotation.rotationY, reducedMotion]);
 
   useFrame(() => {
-    if (!innerGroup.current) return;
+    if (!innerGroup.current || !outerGroup.current) return;
     const elapsed = Math.min(1, (performance.now() - transition.current.startedAt) / FOCUS_DURATION_MS);
-    if (elapsed < 1) {
-      const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
-      innerGroup.current.rotation.x = MathUtils.lerp(transition.current.fromX, transition.current.toX, eased);
-      innerGroup.current.rotation.y = MathUtils.lerp(transition.current.fromY, transition.current.toY, eased);
-      invalidate();
-    }
+    const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
+    innerGroup.current.rotation.x = MathUtils.lerp(transition.current.fromX, transition.current.toX, eased);
+    innerGroup.current.rotation.y = MathUtils.lerp(transition.current.fromY, transition.current.toY, eased);
+    outerGroup.current.rotation.x = MathUtils.lerp(transition.current.outerFromX, transition.current.outerToX, eased);
+    outerGroup.current.rotation.y = MathUtils.lerp(transition.current.outerFromY, transition.current.outerToY, eased);
+    if (elapsed < 1) invalidate();
   });
 
   const handleInteract = useCallback(() => {
@@ -389,6 +416,10 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
         fromY: innerGroup.current.rotation.y,
         toX: innerGroup.current.rotation.x,
         toY: innerGroup.current.rotation.y,
+        outerFromX: outerGroup.current?.rotation.x || 0,
+        outerFromY: outerGroup.current?.rotation.y || 0,
+        outerToX: outerGroup.current?.rotation.x || 0,
+        outerToY: outerGroup.current?.rotation.y || 0,
         startedAt: performance.now(),
       };
     }
@@ -400,7 +431,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
     <pointLight position={[-3, -1.5, -2]} intensity={0.24} color="#0a4d88" />
 
     <group ref={outerGroup}>
-      <OrbitControls groupRef={outerGroup} onInteract={handleInteract} />
+        <OrbitControls groupRef={outerGroup} onInteract={handleInteract} focusActive={Boolean(markerTransition.fromId)} />
       <group ref={innerGroup}>
         <EarthSurface />
         <CloudLayer />

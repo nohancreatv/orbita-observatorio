@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getGlobeFocusRotation } from "./globeFocus";
+import { getGlobeFocusRotation, getShortestRotationTarget } from "./globeFocus";
 
 describe("foco do globo", () => {
   it("converte latitude positiva em rotação X positiva e longitude em rotação Y inversa", () => {
@@ -19,5 +19,10 @@ describe("foco do globo", () => {
   it("limita latitudes inválidas aos polos", () => {
     expect(getGlobeFocusRotation(120, 0).rotationX).toBeCloseTo(Math.PI / 2);
     expect(getGlobeFocusRotation(-120, 0).rotationX).toBeCloseTo(-Math.PI / 2);
+  });
+
+  it("escolhe o caminho angular curto para o meridiano neutro", () => {
+    expect(getShortestRotationTarget((179 * Math.PI) / 180, 0)).toBeCloseTo(0);
+    expect(getShortestRotationTarget((-179 * Math.PI) / 180, 0)).toBeCloseTo(0);
   });
 });

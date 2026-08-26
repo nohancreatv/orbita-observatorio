@@ -25,17 +25,19 @@ import { trpc } from "@/lib/trpc";
 import "../multi-orbit.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
-type SatelliteId = "iss" | "hubble" | "tiangong" | "noaa19";
+type SatelliteId = RouterOutputs["orbit"]["catalog"][number]["id"];
 type UserLocation = { latitude: number; longitude: number; label: string };
 type PassPrediction = RouterOutputs["orbit"]["issClosestPass"];
 type OrbitSnapshot = RouterOutputs["orbit"]["allSnapshots"][number];
 
-const OBJECT_IMAGES: Record<SatelliteId, string> = {
+const OBJECT_IMAGES: Partial<Record<SatelliteId, string>> = {
   iss: "/assets/orbita-iss-card_4ac52eb9.jpg",
   hubble: "/assets/orbita-hubble-card_dc8bbcaf.jpg",
   tiangong: "/assets/orbita-tiangong-card_81d63320.jpg",
   noaa19: "/assets/orbita-noaa19-card_2732cd63.jpg",
 };
+
+const FALLBACK_OBJECT_IMAGE = "/assets/iss-map-texture_2bd39705.jpg";
 
 function formatNumber(value: number | null | undefined, maximumFractionDigits = 0) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
@@ -161,7 +163,7 @@ export default function Home() {
   const selectedName = snapshot?.satellite.name || "objeto orbital";
   const centerLongitude = snapshot?.longitude || 0;
   const centerLatitude = snapshot?.latitude || 0;
-  const selectedImage = OBJECT_IMAGES[selectedSatellite];
+  const selectedImage = OBJECT_IMAGES[selectedSatellite] || FALLBACK_OBJECT_IMAGE;
   const placeImage = placeImageQuery.data;
   const groundPortraitUrl = placeImage?.imageUrl || "/assets/iss-map-texture_2bd39705.jpg";
   const currentTime = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(clock);

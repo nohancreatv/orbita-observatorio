@@ -4,6 +4,12 @@
  */
 import * as satellite from "satellite.js";
 
+const celesTrakTelemetry = (noradId: number) => ({
+  provider: "CelesTrak GP/TLE",
+  endpoint: `https://celestrak.org/NORAD/elements/gp.php?CATNR=${noradId}&FORMAT=TLE`,
+  format: "TLE" as const,
+});
+
 export const SATELLITE_CATALOG = {
   iss: {
     id: "iss",
@@ -12,6 +18,7 @@ export const SATELLITE_CATALOG = {
     noradId: 25544,
     category: "laboratório orbital",
     source: "Where the ISS at?",
+    telemetry: { provider: "Where the ISS at?", endpoint: "https://api.wheretheiss.at/v1/satellites/25544", format: "JSON" as const },
   },
   hubble: {
     id: "hubble",
@@ -20,6 +27,7 @@ export const SATELLITE_CATALOG = {
     noradId: 20580,
     category: "observatório espacial",
     source: "CelesTrak",
+    telemetry: celesTrakTelemetry(20580),
   },
   tiangong: {
     id: "tiangong",
@@ -28,6 +36,7 @@ export const SATELLITE_CATALOG = {
     noradId: 48274,
     category: "estação espacial",
     source: "CelesTrak",
+    telemetry: celesTrakTelemetry(48274),
   },
   noaa19: {
     id: "noaa19",
@@ -36,6 +45,61 @@ export const SATELLITE_CATALOG = {
     noradId: 33591,
     category: "satélite meteorológico",
     source: "CelesTrak",
+    telemetry: celesTrakTelemetry(33591),
+  },
+  noaa20: {
+    id: "noaa20",
+    name: "NOAA 20 (JPSS-1)",
+    shortName: "NOAA 20",
+    noradId: 43013,
+    category: "satélite meteorológico",
+    source: "CelesTrak",
+    telemetry: celesTrakTelemetry(43013),
+  },
+  noaa21: {
+    id: "noaa21",
+    name: "NOAA 21 (JPSS-2)",
+    shortName: "NOAA 21",
+    noradId: 54234,
+    category: "satélite meteorológico",
+    source: "CelesTrak",
+    telemetry: celesTrakTelemetry(54234),
+  },
+  sentinel1a: {
+    id: "sentinel1a",
+    name: "Sentinel-1A",
+    shortName: "Sentinel-1A",
+    noradId: 39634,
+    category: "observação da Terra",
+    source: "CelesTrak",
+    telemetry: celesTrakTelemetry(39634),
+  },
+  landsat9: {
+    id: "landsat9",
+    name: "Landsat 9",
+    shortName: "Landsat 9",
+    noradId: 49260,
+    category: "observação da Terra",
+    source: "CelesTrak",
+    telemetry: celesTrakTelemetry(49260),
+  },
+  terra: {
+    id: "terra",
+    name: "Terra (EOS AM-1)",
+    shortName: "Terra",
+    noradId: 25994,
+    category: "observação da Terra",
+    source: "CelesTrak",
+    telemetry: celesTrakTelemetry(25994),
+  },
+  aqua: {
+    id: "aqua",
+    name: "Aqua (EOS PM-1)",
+    shortName: "Aqua",
+    noradId: 27424,
+    category: "observação da Terra",
+    source: "CelesTrak",
+    telemetry: celesTrakTelemetry(27424),
   },
 } as const;
 
@@ -181,7 +245,7 @@ async function getIssProviderSnapshot(): Promise<IssProviderData> {
 async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): Promise<Omit<OrbitSnapshot, "groundLocation">> {
   const selected = SATELLITE_CATALOG[satelliteId];
   return withCache(`tle:${satelliteId}`, 90_000, async () => {
-    const response = await fetch(`https://celestrak.org/NORAD/elements/gp.php?CATNR=${selected.noradId}&FORMAT=TLE`, {
+    const response = await fetch(selected.telemetry.endpoint, {
       headers: { Accept: "text/plain", "User-Agent": "Orbita-ISS-Observatory/1.0" },
       signal: AbortSignal.timeout(12_000),
     });
@@ -213,7 +277,7 @@ async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): P
       visibility: "estimativa orbital",
       footprint: null,
       timestamp: Math.floor(now.getTime() / 1000),
-      sourceUrl: `https://celestrak.org/NORAD/elements/gp.php?CATNR=${selected.noradId}&FORMAT=TLE`,
+      sourceUrl: selected.telemetry.endpoint,
     };
   });
 }
@@ -232,7 +296,7 @@ export async function getOrbitSnapshot(satelliteId: SatelliteId): Promise<OrbitS
       footprint: iss.footprint,
       timestamp: iss.timestamp,
       groundLocation,
-      sourceUrl: "https://wheretheiss.at/w/developer",
+      sourceUrl: SATELLITE_CATALOG.iss.telemetry.endpoint,
     };
   }
 

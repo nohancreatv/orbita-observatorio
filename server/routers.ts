@@ -7,7 +7,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { getEpicImages, getIssClosestPass, getNearEarthAsteroids, getObservingConditions, getOrbitSnapshot, getOrbitSnapshots, getPlaceImage, getSpaceStory, getSpaceWeather, getUpcomingLaunches, resolveGroundLocation, SATELLITE_CATALOG } from "./orbitService";
 import { isRateLimited } from "./security";
 
-const satelliteIdSchema = z.enum(["iss", "hubble", "tiangong", "noaa19"]);
+const satelliteIdSchema = z.enum(["iss", "hubble", "tiangong", "noaa19", "noaa20", "noaa21", "sentinel1a", "landsat9", "terra", "aqua"]);
 const coordinateSchema = z.number().finite();
 
 const orbitPublicProcedure = publicProcedure.use(({ ctx, next }) => {

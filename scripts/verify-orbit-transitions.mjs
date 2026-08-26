@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium", args: ["--no-sandbox"] });
 const mobileMode = process.env.E2E_MOBILE === "1";
 const page = await browser.newPage({ viewport: mobileMode ? { width: 390, height: 844 } : { width: 1280, height: 720 } });
 const sequence = [
@@ -40,7 +40,7 @@ try {
       };
     }, { from: previous, to: target.id }, { timeout: 5_000 });
     const current = await transitionSnapshot.jsonValue();
-    if (current.marker !== target.id || current.transitionFrom !== previous || current.transitionTo !== target.id || current.isTransitioning !== "true" || current.longitude === beforeLongitude || !current.badge?.includes(target.label) || !current.telemetry?.includes("altitude") || current.telemetry.includes("—") || !current.groundDetails?.includes("superfície") || !current.groundDetails?.includes("leitura")) {
+    if (current.marker !== target.id || current.transitionFrom !== previous || current.transitionTo !== target.id || current.isTransitioning !== "true" || current.longitude === beforeLongitude || !current.badge?.includes(target.label) || !current.telemetry?.includes("altitude") || current.telemetry.includes("—") || !current.groundDetails?.includes("superfície") || !current.groundDetails?.includes("retrato")) {
       throw new Error(`Transição inválida para ${target.label}: ${JSON.stringify({ previous, target, beforeLongitude, current })}`);
     }
     await page.waitForFunction(({ expected }) => {

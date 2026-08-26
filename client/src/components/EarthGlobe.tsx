@@ -80,10 +80,15 @@ function useSafeTexture(url: string) {
   useEffect(() => {
     const loader = new TextureLoader();
     let cancelled = false;
+    let loadedTexture: Texture | null = null;
     loader.load(
       url,
       (loaded) => {
-        if (cancelled) return;
+        if (cancelled) {
+          loaded.dispose();
+          return;
+        }
+        loadedTexture = loaded;
         loaded.colorSpace = SRGBColorSpace;
         loaded.anisotropy = 2;
         setTexture(loaded);
@@ -95,7 +100,10 @@ function useSafeTexture(url: string) {
         setError(true);
       },
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      loadedTexture?.dispose();
+    };
   }, [url]);
 
   return { texture, error };
@@ -107,8 +115,11 @@ function EarthSurface() {
   const { texture: nightMap, error: nightError } = useSafeTexture(NIGHT_MAP);
 
   const material = useMemo(() => {
-    if (dayError && nightError) {
+    if (dayError || nightError) {
+      const availableMap = dayMap ?? nightMap;
       return new MeshStandardMaterial({
+        map: availableMap || undefined,
+        emissiveMap: nightMap || undefined,
         color: new Color("#1a5276"),
         emissive: new Color("#0a2a3f"),
         emissiveIntensity: 0.3,
@@ -117,7 +128,7 @@ function EarthSurface() {
       });
     }
     if (!dayMap || !nightMap) {
-      return new MeshStandardMaterial({ transparent: true, opacity: 0 });
+      return new MeshStandardMaterial({ color: new Color("#17496d"), emissive: new Color("#0a2a3f"), emissiveIntensity: 0.18, roughness: 0.8, metalness: 0.05 });
     }
     return new MeshStandardMaterial({
       map: dayMap,
@@ -159,6 +170,13 @@ function Atmosphere() {
   return <mesh material={material}><sphereGeometry args={[1.045, 44, 44]} /></mesh>;
 }
 
+function GlobeOrbitRing() {
+  return <mesh rotation={[MathUtils.degToRad(66), MathUtils.degToRad(-8), MathUtils.degToRad(18)]} renderOrder={3}>
+    <torusGeometry args={[1.16, 0.012, 8, 96]} />
+    <meshBasicMaterial color="#62d8ff" transparent opacity={0.42} blending={AdditiveBlending} depthWrite={false} />
+  </mesh>;
+}
+
 // ─── Marker Glow ───────────────────────────────────────────────────────
 function MarkerGlow() {
   const material = useMemo(() => new ShaderMaterial({
@@ -170,7 +188,7 @@ function MarkerGlow() {
 }
 
 // ─── Satellite Marker ──────────────────────────────────────────────────
-function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Marker; active: boolean; transition: MarkerTransition; onSelect: (id: string) => void }) {
+function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }: { marker: Marker; active: boolean; transition: MarkerTransition; onSelect: (id: string) => void; reducedMotion: boolean }) {
   const position = useMemo(() => toCartesian(marker.latitude, marker.longitude, 1.065), [marker.latitude, marker.longitude]);
   const outgoingRing = useRef<Group>(null);
   const incomingRing = useRef<Group>(null);
@@ -180,6 +198,7 @@ function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Mar
   const isEntering = transition.fromId !== null && transition.toId === marker.id;
 
   useFrame(({ invalidate }) => {
+    if (reducedMotion) return;
     if (isLeaving && outgoingRing.current) {
       const p = Math.min(1, (performance.now() - transition.startedAt) / FOCUS_DURATION_MS);
       outgoingRing.current.scale.setScalar(Math.max(.01, 1 - p));
@@ -214,11 +233,11 @@ function SatelliteMarker({ marker, active, transition, onSelect }: { marker: Mar
 }
 
 // ─── User Location Marker ──────────────────────────────────────────────
-function UserLocationMarker({ location }: { location: { latitude: number; longitude: number } }) {
+function UserLocationMarker({ location, reducedMotion }: { location: { latitude: number; longitude: number }; reducedMotion: boolean }) {
   const pos = useMemo(() => toCartesian(location.latitude, location.longitude, 1.055), [location.latitude, location.longitude]);
   const beacon = useRef<Group>(null);
   useFrame(() => {
-    if (!beacon.current) return;
+    if (reducedMotion || !beacon.current) return;
     const t = performance.now() / 1000;
     beacon.current.scale.setScalar(1 + Math.sin(t * Math.PI * 2) * 0.2);
   });
@@ -234,21 +253,26 @@ function UserLocationMarker({ location }: { location: { latitude: number; longit
 // ─── Orbit Controls ────────────────────────────────────────────────────
 // Manages the OUTER group: drag, inertia, auto-rotate.
 // Independent from satellite focus transition.
-function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void; focusActive?: boolean }) {
+function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotion = false }: { groupRef: React.RefObject<Group | null>; onInteract?: () => void; focusActive?: boolean; reducedMotion?: boolean }) {
   const onInteractRef = useRef(onInteract);
   useEffect(() => { onInteractRef.current = onInteract; }, [onInteract]);
   const { gl } = useThree();
   const isDragging = useRef(false);
   const prevPointer = useRef({ x: 0, y: 0 });
   const velocity = useRef({ x: 0, y: 0 });
+  const activeInput = useRef<"pointer" | "touch" | null>(null);
   const autoRotate = useRef(true);
   const autoRotateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasFocusActive = useRef(false);
+  const wasReducedMotion = useRef(reducedMotion);
 
   useEffect(() => {
     const dom = gl.domElement;
 
     const onPointerDown = (e: PointerEvent) => {
+      if (activeInput.current === "touch") return;
+      activeInput.current = "pointer";
+      dom.setPointerCapture?.(e.pointerId);
       isDragging.current = true;
       autoRotate.current = false;
       if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
@@ -258,7 +282,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (!isDragging.current || !groupRef.current) return;
+      if (activeInput.current !== "pointer" || !isDragging.current || !groupRef.current) return;
       const dx = e.clientX - prevPointer.current.x;
       const dy = e.clientY - prevPointer.current.y;
       prevPointer.current = { x: e.clientX, y: e.clientY };
@@ -270,13 +294,17 @@ function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef
       );
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e: PointerEvent) => {
+      if (activeInput.current !== "pointer") return;
       isDragging.current = false;
+      activeInput.current = null;
+      if (dom.hasPointerCapture?.(e.pointerId)) dom.releasePointerCapture?.(e.pointerId);
       autoRotateTimer.current = setTimeout(() => { autoRotate.current = true; }, AUTO_ROTATE_DELAY_MS);
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
+      if (activeInput.current === "pointer" || e.touches.length !== 1) return;
+      activeInput.current = "touch";
       isDragging.current = true;
       autoRotate.current = false;
       if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
@@ -286,7 +314,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!isDragging.current || !groupRef.current || e.touches.length !== 1) return;
+      if (activeInput.current !== "touch" || !isDragging.current || !groupRef.current || e.touches.length !== 1) return;
       e.preventDefault();
       const dx = e.touches[0].clientX - prevPointer.current.x;
       const dy = e.touches[0].clientY - prevPointer.current.y;
@@ -300,9 +328,14 @@ function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef
     };
 
     const onTouchEnd = () => {
+      if (activeInput.current !== "touch") return;
       isDragging.current = false;
+      activeInput.current = null;
       autoRotateTimer.current = setTimeout(() => { autoRotate.current = true; }, AUTO_ROTATE_DELAY_MS);
     };
+
+    const previousTouchAction = dom.style.touchAction;
+    dom.style.touchAction = "none";
 
     dom.addEventListener("pointerdown", onPointerDown);
     dom.addEventListener("pointermove", onPointerMove);
@@ -314,6 +347,8 @@ function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef
 
     return () => {
       if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+      activeInput.current = null;
+      dom.style.touchAction = previousTouchAction;
       dom.removeEventListener("pointerdown", onPointerDown);
       dom.removeEventListener("pointermove", onPointerMove);
       dom.removeEventListener("pointerup", onPointerUp);
@@ -325,6 +360,17 @@ function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef
   }, [gl, groupRef]);
 
   useEffect(() => {
+    if (reducedMotion) {
+      autoRotate.current = false;
+      velocity.current = { x: 0, y: 0 };
+      if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
+    } else if (wasReducedMotion.current && !focusActive) {
+      autoRotate.current = true;
+    }
+    wasReducedMotion.current = reducedMotion;
+  }, [focusActive, reducedMotion]);
+
+  useEffect(() => {
     if (focusActive) {
       wasFocusActive.current = true;
       autoRotate.current = false;
@@ -334,26 +380,31 @@ function OrbitControls({ groupRef, onInteract, focusActive = false }: { groupRef
     }
     if (!wasFocusActive.current) return;
     wasFocusActive.current = false;
+    autoRotate.current = false;
     autoRotateTimer.current = setTimeout(() => { autoRotate.current = true; }, AUTO_ROTATE_DELAY_MS);
   }, [focusActive]);
 
   // Inertia + auto-rotate every frame on the OUTER group
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!groupRef.current) return;
-    if (focusActive || isDragging.current) return;
+    if (focusActive || isDragging.current || reducedMotion) return;
 
+    // Normaliza a 60 Hz: a rotação não fica mais lenta em monitores de 120 Hz
+    // nem dá saltos excessivos quando um frame demora mais que o esperado.
+    const frameScale = Math.min(2, delta * 60);
     if (!autoRotate.current && (Math.abs(velocity.current.x) > 0.0001 || Math.abs(velocity.current.y) > 0.0001)) {
-      velocity.current.x *= INERTIA_DAMPING;
-      velocity.current.y *= INERTIA_DAMPING;
-      groupRef.current.rotation.y += velocity.current.x;
+      const damping = Math.pow(INERTIA_DAMPING, frameScale);
+      velocity.current.x *= damping;
+      velocity.current.y *= damping;
+      groupRef.current.rotation.y += velocity.current.x * frameScale;
       groupRef.current.rotation.x = MathUtils.clamp(
-        groupRef.current.rotation.x + velocity.current.y,
+        groupRef.current.rotation.x + velocity.current.y * frameScale,
         -MAX_TILT, MAX_TILT,
       );
     }
 
     if (autoRotate.current) {
-      groupRef.current.rotation.y += AUTO_ROTATE_SPEED;
+      groupRef.current.rotation.y += AUTO_ROTATE_SPEED * frameScale;
     }
   });
 
@@ -383,6 +434,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
     if (reducedMotion) {
       innerGroup.current.rotation.set(targetRotation.rotationX, targetRotation.rotationY, 0);
       outerGroup.current?.rotation.set(0, 0, 0);
+      transition.current = { fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, outerFromX: 0, outerFromY: 0, outerToX: 0, outerToY: 0, startedAt: performance.now() - FOCUS_DURATION_MS };
       return;
     }
     transition.current = {
@@ -431,15 +483,16 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
     <pointLight position={[-3, -1.5, -2]} intensity={0.24} color="#0a4d88" />
 
     <group ref={outerGroup}>
-        <OrbitControls groupRef={outerGroup} onInteract={handleInteract} focusActive={Boolean(markerTransition.fromId)} />
+        <OrbitControls groupRef={outerGroup} onInteract={handleInteract} focusActive={Boolean(markerTransition.fromId)} reducedMotion={reducedMotion} />
+      <GlobeOrbitRing />
       <group ref={innerGroup}>
         <EarthSurface />
         <CloudLayer />
         <Atmosphere />
         {markers.map(marker => (
-          <SatelliteMarker key={marker.id} marker={marker} active={marker.id === selectedId} transition={markerTransition} onSelect={onSelect} />
+          <SatelliteMarker key={marker.id} marker={marker} active={marker.id === selectedId} transition={markerTransition} onSelect={onSelect} reducedMotion={reducedMotion} />
         ))}
-        {userLocation && <UserLocationMarker location={userLocation} />}
+        {userLocation && <UserLocationMarker location={userLocation} reducedMotion={reducedMotion} />}
       </group>
     </group>
   </>;

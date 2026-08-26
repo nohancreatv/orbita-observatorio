@@ -717,3 +717,6 @@
 
 .cookie-consent__choices { display: grid; gap: 2px; }
 .cookie-consent__choices .cookie-consent__choice { margin-top: 12px; }
+
+.three-globe canvas { cursor: grab; touch-action: none; }
+.three-globe canvas:active { cursor: grabbing; }

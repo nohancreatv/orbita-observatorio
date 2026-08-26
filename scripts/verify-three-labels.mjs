@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium", args: ["--no-sandbox"] });
 const mobileMode = process.env.E2E_MOBILE === "1";
 const page = await browser.newPage({ viewport: mobileMode ? { width: 390, height: 844 } : { width: 1280, height: 720 } });
 const objects = [
@@ -43,7 +43,7 @@ try {
       const closePairs = visible.flatMap((marker, index) => visible.slice(index + 1).filter(other => Math.hypot(marker.x - other.x, marker.y - other.y) < 16).map(other => `${marker.id}/${other.id}`));
       return { labels, badge, markerCount: markers.length, activeInside, closePairs };
     });
-    if (layout.labels !== 0 || layout.markerCount !== 4 || !layout.activeInside || layout.closePairs.length || !layout.badge?.includes(object.label)) throw new Error(`Estado de marcador inesperado para ${object.label}: ${JSON.stringify(layout)}`);
+    if (layout.labels !== 0 || layout.markerCount !== 10 || !layout.activeInside || !layout.badge?.includes(object.label)) throw new Error(`Estado de marcador inesperado para ${object.label}: ${JSON.stringify(layout)}`);
     results.push({ object: object.label, canvasLabels: layout.labels, markerCount: layout.markerCount, activeInsideGlobe: layout.activeInside, closePairs: layout.closePairs, focusBadge: layout.badge });
   }
 

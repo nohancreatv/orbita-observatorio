@@ -228,3 +228,407 @@
 .passage-alert { max-width: 455px; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(205,225,239,.15); }.pass-alert-button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 10px 12px; border: 1px solid rgba(99,230,190,.38); background: rgba(99,230,190,.07); color: #83ebcb; font: 600 .69rem/1 "Manrope", sans-serif; transition: background .16s ease, color .16s ease, transform .16s ease; }.pass-alert-button:hover { background: rgba(99,230,190,.16); }.pass-alert-button:active { transform: scale(.97); }.pass-alert-button.is-active { border-color: #63e6be; background: #63e6be; color: #07111f; }.passage-alert p { margin-top: 9px; color: #8294a0; font: .6rem/1.55 "IBM Plex Mono", monospace; }
 .cookie-consent { position: fixed; z-index: 40; right: 24px; bottom: 24px; width: min(520px, calc(100% - 32px)); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 17px; padding: 20px; border: 1px solid rgba(160,225,209,.34); background: rgba(7,20,35,.94); box-shadow: 0 20px 70px rgba(0,0,0,.36); backdrop-filter: blur(18px); }.cookie-consent__icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: #63e6be; background: rgba(99,230,190,.1); }.cookie-consent__copy h2 { margin-top: 8px; color: #f5f2e9; font: 400 1.65rem/1 "DM Serif Display", serif; letter-spacing: -.035em; }.cookie-consent__copy > p:not(.eyebrow) { margin-top: 9px; color: #aebec7; font-size: .72rem; line-height: 1.55; }.cookie-consent__copy a { display: inline-block; margin-top: 9px; color: #79edca; font: .59rem/1 "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .07em; }.cookie-consent__choice { display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; color: #d7e6e3; font-size: .71rem; line-height: 1.45; }.cookie-consent__choice input { width: 15px; height: 15px; accent-color: #63e6be; }.cookie-consent__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 15px; border-top: 1px solid rgba(205,225,239,.15); }.consent-button { min-height: 34px; padding: 9px 11px; border: 1px solid rgba(205,225,239,.2); background: transparent; color: #b9c8cf; font: 600 .62rem/1 "Manrope", sans-serif; transition: transform .16s ease, background .16s ease, color .16s ease; }.consent-button:hover { color: #f1f7f3; background: rgba(205,225,239,.08); }.consent-button:active { transform: scale(.97); }.consent-button--settings { display: inline-flex; align-items: center; gap: 6px; }.consent-button--primary { border-color: #63e6be; background: #63e6be; color: #07111f; }.consent-button--primary:hover { background: #89f0cf; color: #07111f; }.consent-button--quiet { color: #aab9c1; }
 @media (max-width: 760px) { .cookie-consent { right: 16px; bottom: 16px; grid-template-columns: 1fr; gap: 13px; }.cookie-consent__icon { display: none; }.cookie-consent__actions { justify-content: stretch; }.consent-button { flex: 1 1 145px; }.passage-alert { max-width: none; } }
+
+
+/* ─── Harmonização editorial do observatório ──────────────────────────── */
+:root {
+  --layout-width: 1280px;
+  --layout-gutter: clamp(28px, 4vw, 56px);
+  --section-gap: clamp(84px, 9vw, 128px);
+}
+
+.site-header,
+.hero-section,
+.telemetry-strip,
+.object-focus-section,
+.ground-location-section,
+.passage-section,
+.today-observing-section,
+.sky-conditions-section,
+.launches-section,
+.space-story-section,
+.context-section,
+.site-footer {
+  width: min(var(--layout-width), calc(100% - (var(--layout-gutter) * 2)));
+}
+
+.site-header {
+  height: 84px;
+}
+
+.hero-section {
+  min-height: 620px;
+  grid-template-columns: minmax(0, .88fr) minmax(0, 1.12fr);
+  gap: clamp(32px, 5vw, 76px);
+}
+
+.intro-column {
+  max-width: 570px;
+  padding: 64px 0 36px;
+}
+
+.hero-section h1 {
+  max-width: 570px;
+  margin-top: 24px;
+  font-size: clamp(3.45rem, 5.2vw, 5.2rem);
+  line-height: .92;
+}
+
+.hero-description {
+  max-width: 500px;
+  margin-top: 22px;
+  line-height: 1.65;
+}
+
+.satellite-selector {
+  margin-top: 25px;
+  padding-top: 14px;
+}
+
+.action-row {
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.live-readout {
+  margin-top: 24px;
+}
+
+.orbital-stage {
+  height: 500px;
+}
+
+.globe-frame,
+.three-globe {
+  left: 53%;
+  top: 51%;
+  width: min(430px, 76%);
+}
+
+.globe-badge {
+  right: 2%;
+  bottom: 7%;
+}
+
+.orbit-caption-top {
+  left: 2%;
+  top: 14%;
+}
+
+.object-focus-section {
+  min-height: 300px;
+  margin-top: 72px;
+  grid-template-columns: minmax(250px, .78fr) minmax(390px, 1.24fr) minmax(250px, .74fr);
+}
+
+.object-focus-image,
+.object-ground-portrait {
+  min-height: 300px;
+}
+
+.object-focus-copy {
+  padding: clamp(32px, 3.8vw, 54px);
+}
+
+.object-focus-copy h2 {
+  font-size: clamp(2.3rem, 3.25vw, 3.45rem);
+}
+
+.telemetry-strip {
+  margin-top: -24px;
+}
+
+.ground-location-section {
+  margin-top: 70px;
+  grid-template-columns: minmax(0, .9fr) minmax(360px, 1fr) minmax(190px, .52fr);
+}
+
+.passage-section,
+.sky-conditions-section,
+.launches-section {
+  gap: clamp(40px, 7vw, 96px);
+}
+
+.passage-section {
+  margin-top: var(--section-gap);
+}
+
+.sky-conditions-section {
+  margin-top: var(--section-gap);
+}
+
+.launches-section {
+  margin-top: var(--section-gap);
+}
+
+.space-story-section {
+  margin-top: var(--section-gap);
+}
+
+.context-section {
+  margin-top: var(--section-gap);
+}
+
+.site-footer {
+  margin-top: 68px;
+}
+
+@media (min-width: 1200px) {
+  .site-header,
+  .hero-section,
+  .telemetry-strip,
+  .object-focus-section,
+  .ground-location-section,
+  .passage-section,
+  .today-observing-section,
+  .sky-conditions-section,
+  .launches-section,
+  .space-story-section,
+  .context-section,
+  .site-footer {
+    width: min(var(--layout-width), calc(100% - 72px));
+  }
+}
+
+@media (max-width: 1050px) {
+  :root {
+    --layout-gutter: 32px;
+  }
+
+  .hero-section {
+    gap: 30px;
+  }
+
+  .orbital-stage {
+    height: 470px;
+  }
+
+  .object-focus-section {
+    margin-top: 60px;
+  }
+
+  .ground-location-section {
+    margin-top: 60px;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --layout-gutter: 16px;
+    --section-gap: 72px;
+  }
+
+  .site-header,
+  .hero-section,
+  .telemetry-strip,
+  .object-focus-section,
+  .ground-location-section,
+  .passage-section,
+  .today-observing-section,
+  .sky-conditions-section,
+  .launches-section,
+  .space-story-section,
+  .context-section,
+  .site-footer {
+    width: calc(100% - 32px);
+  }
+
+  .site-header {
+    height: 76px;
+  }
+
+  .hero-section {
+    min-height: 0;
+  }
+
+  .intro-column {
+    padding: 44px 0 0;
+  }
+
+  .hero-section h1 {
+    max-width: 340px;
+    margin-top: 20px;
+    font-size: clamp(3.15rem, 14.5vw, 4.25rem);
+    line-height: .9;
+  }
+
+  .hero-description {
+    max-width: 330px;
+    margin-top: 18px;
+    font-size: .88rem;
+    line-height: 1.6;
+  }
+
+  .satellite-selector {
+    margin-top: 22px;
+  }
+
+  .action-row {
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .privacy-note {
+    max-width: 138px;
+  }
+
+  .live-readout {
+    margin-top: 20px;
+  }
+
+  .orbital-stage {
+    height: 340px;
+    margin: 0 -8px;
+  }
+
+  .globe-frame,
+  .three-globe {
+    width: min(320px, 82vw);
+    left: 53%;
+    top: 49%;
+  }
+
+  .globe-badge {
+    right: 0;
+    bottom: 6%;
+  }
+
+  .object-focus-section {
+    margin-top: 48px;
+  }
+
+  .object-focus-image {
+    min-height: 214px;
+  }
+
+  .object-focus-copy {
+    padding: 31px 20px 34px;
+  }
+
+  .object-focus-copy h2 {
+    font-size: clamp(2.45rem, 10.7vw, 3.5rem);
+  }
+
+  .object-ground-portrait {
+    min-height: 210px;
+  }
+
+  .telemetry-strip {
+    margin-top: 14px;
+  }
+
+  .ground-location-section {
+    margin-top: 56px;
+  }
+
+  .passage-section,
+  .sky-conditions-section,
+  .launches-section,
+  .space-story-section,
+  .context-section {
+    margin-top: var(--section-gap);
+  }
+
+  .passage-section {
+    gap: 34px;
+  }
+
+  .passage-art {
+    min-height: 250px;
+  }
+
+  .passage-art img {
+    height: 250px;
+  }
+
+  .site-footer {
+    margin-top: 56px;
+  }
+
+  .cookie-consent {
+    right: 12px;
+    bottom: 12px;
+    width: calc(100% - 24px);
+    padding: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .hero-section h1 {
+    max-width: 312px;
+    font-size: clamp(2.95rem, 14.1vw, 3.65rem);
+  }
+
+  .orbital-stage {
+    height: 320px;
+  }
+
+  .globe-frame,
+  .three-globe {
+    width: min(300px, 82vw);
+  }
+
+  .globe-badge {
+    padding: 8px 10px;
+  }
+
+  .globe-badge strong {
+    font-size: .57rem;
+  }
+
+  .object-focus-copy {
+    padding-inline: 17px;
+  }
+
+  .ground-location-card {
+    padding-inline: 21px;
+  }
+}
+
+
+/* Correção de grade intermediária: nenhum painel pode impor largura mínima à viewport. */
+@media (min-width: 761px) and (max-width: 1050px) {
+  .object-focus-section,
+  .passage-section,
+  .sky-conditions-section,
+  .launches-section,
+  .space-story-section {
+    min-width: 0;
+  }
+
+  .object-focus-section {
+    grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+  }
+
+  .object-focus-section > *,
+  .object-ground-portrait,
+  .object-ground-portrait > img {
+    min-width: 0;
+  }
+
+  .passage-section,
+  .sky-conditions-section,
+  .launches-section {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 32px;
+  }
+
+  .space-story-section {
+    grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+  }
+}
+
+
+/* O Canvas recebe dimensões próprias do renderer; limitar a caixa CSS evita overflow em tablets. */
+.three-globe {
+  overflow: hidden;
+}
+
+.three-globe > div,
+.three-globe canvas {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+}

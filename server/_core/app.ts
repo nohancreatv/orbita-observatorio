@@ -4,7 +4,6 @@ import { appRouter } from "../routers";
 import { productionSecurityHeaders } from "../security";
 import { createContext } from "./context";
 import { registerOAuthRoutes } from "./oauth";
-import { registerStorageProxy } from "./storageProxy";
 
 /**
  * Cria o núcleo HTTP compartilhado pelo servidor local e pela função Netlify.
@@ -22,7 +21,6 @@ export function createApiApp() {
     res.setHeader("Cache-Control", "no-store, max-age=0");
     next();
   });
-  registerStorageProxy(app);
   registerOAuthRoutes(app);
   app.use(
     "/api/trpc",

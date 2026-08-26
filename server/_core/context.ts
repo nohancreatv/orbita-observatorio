@@ -8,7 +8,7 @@
  * The JWT is verified with the shared secret. If it is missing or invalid the
  * user is simply `null` — protected procedures will reject the request.
  *
- * NO external agent platform (Manus, Freebuff, etc.) is required.
+ * No external agent platform is required.
  */
 import type { Request, Response } from "express";
 import { jwtVerify } from "jose";

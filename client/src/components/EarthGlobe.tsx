@@ -4,9 +4,9 @@ import type { Texture } from "three";
 import { AdditiveBlending, BackSide, Color, DoubleSide, Group, MathUtils, MeshStandardMaterial, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector3 } from "three";
 
 // ─── Constants ─────────────────────────────────────────────────────────
-const DAY_MAP = "/manus-storage/earth-day-atlas_ee47322f.jpg";
-const NIGHT_MAP = "/manus-storage/earth-night-atlas_06d895db.jpg";
-const CLOUD_MAP = "/manus-storage/earth-clouds-atlas_8c506c86.png";
+const DAY_MAP = "/assets/earth-day-atlas_ee47322f.jpg";
+const NIGHT_MAP = "/assets/earth-night-atlas_06d895db.jpg";
+const CLOUD_MAP = "/assets/earth-clouds-atlas_8c506c86.png";
 const FOCUS_DURATION_MS = 500;
 const ROTATION_SENSITIVITY = 0.006;
 const INERTIA_DAMPING = 0.93;

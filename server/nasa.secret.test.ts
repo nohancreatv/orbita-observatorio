@@ -1,9 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getSpaceStory } from "./orbitService";
 
-describe("credencial NASA Open APIs", () => {
-  it("está disponível para o serviço no ambiente de execução", () => {
-    const apiKey = process.env.NASA_API_KEY;
-    expect(apiKey, "NASA_API_KEY deve estar configurada no ambiente").toBeTruthy();
-    expect(apiKey?.trim().length, "NASA_API_KEY não deve estar em branco").toBeGreaterThan(0);
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("credencial opcional da NASA Open APIs", () => {
+  it("mantém a curiosidade disponível sem uma chave configurada", async () => {
+    vi.stubEnv("NASA_API_KEY", "");
+
+    await expect(getSpaceStory()).resolves.toMatchObject({
+      title: "O arquivo do cosmos está em pausa.",
+      sourceUrl: "https://api.nasa.gov/",
+    });
   });
 });

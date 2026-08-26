@@ -21,7 +21,7 @@ As integrações externas incluem dados orbitais públicos, NASA APOD, geocodifi
 | Deploy       | `netlify.toml`             |
 | Verificações | `scripts/`                 |
 
-O frontend é estático e a camada pública tRPC é atendida por uma Netlify Function que encapsula a aplicação Express. As rotas `/api/trpc/*` são encaminhadas para essa função. Os ativos do globo em `/manus-storage/*` usam um redirect controlado para o armazenamento gerenciado, sem expor uma chave ao navegador.
+O frontend é estático e a camada pública tRPC é atendida por uma Netlify Function que encapsula a aplicação Express. As rotas `/api/trpc/*` são encaminhadas para essa função. Todos os ativos visuais do globo ficam versionados em `client/public/assets/` e são servidos diretamente pela Netlify, sem storage proprietário ou serviço intermediário.
 
 ## Pré-requisitos
 
@@ -56,7 +56,7 @@ O proxy do Netlify atende normalmente em `http://localhost:8888` e encaminha API
 
 Não envie valores de produção para o repositório e não versione arquivos `.env`. `NASA_API_KEY` é usada apenas pela função Netlify e melhora a consulta APOD; se ausente, o cartão NASA mostra contingência sem interromper a telemetria. `VITE_ADSENSE_PUBLISHER_ID` é um Publisher ID público no formato `ca-pub-...`; sem ele, o Auto Ads não é carregado.
 
-Uma implantação externa com login Manus persistente também requer `DATABASE_URL`, `JWT_SECRET`, `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL` e `OWNER_OPEN_ID`. Antes de ativar esse login fora do ambiente gerenciado, registre o domínio de callback OAuth autorizado.
+As funcionalidades públicas não exigem login, banco de dados ou credenciais proprietárias. O código mantém apenas uma camada opcional de sessão local para futuras funcionalidades privadas; ela só deve ser ativada com um banco e um provedor OAuth externo escolhidos pelo responsável pelo projeto.
 
 Na automação do GitHub Actions, `NETLIFY_AUTH_TOKEN` é o único valor que precisa ser cadastrado no repositório. Ele é um segredo e nunca deve usar o prefixo `VITE_`. O identificador não secreto do projeto Netlify e o Publisher ID público do AdSense ficam definidos no workflow para evitar variáveis de repositório adicionais.
 
@@ -85,7 +85,7 @@ Depois de salvar os dois valores, faça um push na `main` ou abra **Actions → 
 
 ## Segurança e operação
 
-Dependências, saídas de build, `.netlify` e arquivos `.env*` são ignorados pelo Git. O `netlify.toml` mantém CSP, HSTS, políticas de permissão, proteção de iframe e redirects de API. A política de imagens autoriza somente o host CloudFront necessário para as texturas do globo, evitando uma falha de carregamento 3D que acionaria a fronteira de erro.
+Dependências, saídas de build, `.netlify` e arquivos `.env*` são ignorados pelo Git. O `netlify.toml` mantém CSP, HSTS, políticas de permissão, proteção de iframe e redirects de API. A política de imagens autoriza os provedores públicos usados pelas integrações e os ativos locais versionados, evitando falhas de carregamento 3D que acionem a fronteira de erro.
 
 ## Referências
 

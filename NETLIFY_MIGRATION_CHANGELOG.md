@@ -25,9 +25,9 @@ Em ambiente local, foram aprovados a checagem TypeScript, **12 arquivos / 18 tes
 
 ## Configuração externa
 
-O projeto Netlify recebeu `NASA_API_KEY` como segredo de função e `VITE_ADSENSE_PUBLISHER_ID` como variável pública de build. Os ativos do globo continuam referenciados por rewrite ao armazenamento da publicação Manus, portanto nenhum segredo de armazenamento é entregue ao frontend.
+Na migração inicial, o projeto Netlify recebeu `NASA_API_KEY` como segredo de função e `VITE_ADSENSE_PUBLISHER_ID` como variável pública de build. A estratégia histórica de armazenamento proprietário foi posteriormente removida; os ativos atuais são versionados em `client/public/assets/`.
 
-> O login Manus não foi ativado no domínio Netlify porque suas variáveis de OAuth e a URL de callback não foram configuradas nesse provedor. Isso não afeta as funcionalidades públicas do observatório, que são a superfície atualmente publicada.
+> A migração inicial não ativou login externo no domínio Netlify. O site atual mantém as funcionalidades públicas sem autenticação e sem depender de um provedor proprietário.
 
 ## Arquivos principais
 
@@ -42,6 +42,13 @@ O projeto Netlify recebeu `NASA_API_KEY` como segredo de função e `VITE_ADSENS
 
 ## Correção da recuperação recorrente
 
-A tela “O observatório encontrou uma interferência” não era causada pela telemetria. A política `img-src` do Netlify permitia a URL interna `/manus-storage`, mas bloqueava o host CloudFront para o qual essa URL redirecionava. Quando a textura diurna da Terra era bloqueada, o `TextureLoader` do Three.js lançava uma exceção e a fronteira de erro assumia a tela inteira.
+Em uma versão anterior, a tela “O observatório encontrou uma interferência” podia ser causada por uma textura que falhava ao carregar. O problema foi eliminado ao manter as texturas do globo como ativos versionados no próprio repositório e ao remover o redirect de storage proprietário.
 
-A CSP foi corrigida para autorizar apenas `https://d36hbw14aib5lz.cloudfront.net` em `img-src`, que é o host efetivo das texturas já vinculadas ao projeto. A sonda `scripts/debug-recovery-netlify.mjs` executou seis carregamentos de produção sem exceção de página e sem exibir o estado de recuperação. Avisos isolados de provedores externos de anúncios permaneceram fora do escopo da renderização do observatório.
+A CSP permanece restritiva e autoriza os hosts públicos realmente usados pelas integrações e os ativos locais versionados. A sonda `scripts/debug-recovery-netlify.mjs` executou seis carregamentos de produção sem exceção de página e sem exibir o estado de recuperação. Avisos isolados de provedores externos de anúncios permaneceram fora do escopo da renderização do observatório.
+
+
+## Correção de independência da plataforma — 2026-08-25
+
+A publicação Netlify agora utiliza somente ativos versionados em `client/public/assets/`, sem redirects para storage proprietário. O runtime de desenvolvimento não usa plugin de plataforma, e os helpers de Forge para storage, mapas, notificações, geração de imagens, dados genéricos e transcrição foram removidos por não participarem do produto público. A validação de release passou a aceitar a origem configurável por `SITE_ORIGIN`, com `BASE_URL` para execução local.
+
+As funcionalidades do observatório continuam baseadas em código próprio, Netlify Functions e APIs públicas configuráveis, incluindo fontes orbitais, NASA, Open-Meteo, BigDataCloud, ArcGIS e The Space Devs. Nenhuma funcionalidade essencial depende de Manus.

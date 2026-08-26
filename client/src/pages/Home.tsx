@@ -107,7 +107,9 @@ export default function Home() {
   const snapshot = allSnapshots.find(item => item.satellite.id === selectedSatellite);
   const prediction: PassPrediction | undefined = closestPass.data;
   const satellites = catalogQuery.data || [];
-  const availableSatellites = useMemo(() => satellites.filter(satellite => allSnapshots.some(item => item.satellite.id === satellite.id)), [allSnapshots, satellites]);
+  // O catálogo é a fonte da lista: uma falha parcial de telemetria não pode
+  // esconder objetos rastreáveis nem removê-los do seletor.
+  const availableSatellites = satellites;
   const observingInput = useMemo(() => userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : { latitude: 0, longitude: 0 }, [userLocation]);
   const observingQuery = trpc.observation.conditions.useQuery(observingInput, { enabled: Boolean(userLocation), staleTime: 15 * 60_000, retry: 1 });
 
@@ -127,10 +129,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (allSnapshots.length && !allSnapshots.some(item => item.satellite.id === selectedSatellite)) {
-      setSelectedSatellite(allSnapshots[0].satellite.id);
+    if (satellites.length && !satellites.some(item => item.id === selectedSatellite)) {
+      setSelectedSatellite(satellites[0].id as SatelliteId);
     }
-  }, [allSnapshots, selectedSatellite]);
+  }, [satellites, selectedSatellite]);
 
   useEffect(() => {
     if (allSnapshotsQuery.isSuccess && allSnapshots.length) {
@@ -220,7 +222,7 @@ export default function Home() {
           <RevealText as="h1" id="hero-title" segments={[{ text: "O que está passando" }, { text: "em cima", emphasis: true }, { text: "de mim agora?" }]} />
           <p className="hero-description">Observe a constelação em movimento, compare seus objetos e descubra qual território está diretamente abaixo de cada órbita.</p>
           <div className="satellite-selector" aria-label="Selecionar objeto orbital">
-            <span className="selector-label">na constelação · {allSnapshots.length || "—"} rastreados</span>
+            <span className="selector-label">na constelação · {satellites.length || "—"} disponíveis · {allSnapshots.length || "—"} com sinal</span>
             <div className="selector-options stagger-list">
               {availableSatellites.length ? availableSatellites.map(satellite => <button key={satellite.id} type="button" onClick={() => setSelectedSatellite(satellite.id as SatelliteId)} className={selectedSatellite === satellite.id ? "satellite-option is-active" : "satellite-option"} aria-pressed={selectedSatellite === satellite.id}>{satellite.shortName}</button>) : <span className="catalog-loading">carregando satélites…</span>}
             </div>

@@ -182,7 +182,7 @@ function MarkerGlow() {
   const material = useMemo(() => new ShaderMaterial({
     vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
     fragmentShader: "varying vec2 vUv; void main() { float dist = length(vUv - vec2(0.5)); float glow = smoothstep(0.5, 0.0, dist); glow = pow(glow, 2.0); vec3 color = mix(vec3(0.99, 0.61, 0.43), vec3(1.0, 0.82, 0.62), glow); gl_FragColor = vec4(color, glow * 0.55); }",
-    transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
+    transparent: true, depthTest: false, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
   }), []);
   return <mesh material={material}><planeGeometry args={[0.28, 0.28]} /></mesh>;
 }
@@ -221,13 +221,13 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }
   });
 
   return (
-    <group position={position} onClick={(e) => { e.stopPropagation(); onSelect(marker.id); }}>
-      {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} side={DoubleSide} /></mesh></group>}
-      {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.07, 0.085, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} side={DoubleSide} /></mesh></group>}
-      {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.068, 0.082, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} side={DoubleSide} /></mesh></group>}
+    <group position={position} renderOrder={active ? 6 : 5} onClick={(e) => { e.stopPropagation(); onSelect(marker.id); }}>
+      {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} depthTest={false} side={DoubleSide} /></mesh></group>}
+      {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.07, 0.085, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} depthTest={false} side={DoubleSide} /></mesh></group>}
+      {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.068, 0.082, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} depthTest={false} side={DoubleSide} /></mesh></group>}
       {active && <group ref={glowRef}><MarkerGlow /></group>}
-      <mesh><sphereGeometry args={[active ? 0.042 : 0.03, 16, 16]} /><meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} /></mesh>
-      {active && <mesh><sphereGeometry args={[0.018, 10, 10]} /><meshBasicMaterial color="#fff5ee" /></mesh>}
+      <mesh><sphereGeometry args={[active ? 0.042 : 0.03, 16, 16]} /><meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} depthTest={false} /></mesh>
+      {active && <mesh><sphereGeometry args={[0.018, 10, 10]} /><meshBasicMaterial color="#fff5ee" depthTest={false} /></mesh>}
     </group>
   );
 }

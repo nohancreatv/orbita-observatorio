@@ -8,11 +8,18 @@ const objects = [
   { button: "Hubble", id: "hubble", label: "Hubble" },
   { button: "Tiangong", id: "tiangong", label: "Tiangong" },
   { button: "NOAA 19", id: "noaa19", label: "NOAA 19" },
+  { button: "NOAA 20", id: "noaa20", label: "NOAA 20" },
+  { button: "NOAA 21", id: "noaa21", label: "NOAA 21" },
+  { button: "Sentinel-1A", id: "sentinel1a", label: "Sentinel-1A" },
+  { button: "Landsat 9", id: "landsat9", label: "Landsat 9" },
+  { button: "Terra", id: "terra", label: "Terra" },
+  { button: "Aqua", id: "aqua", label: "Aqua" },
 ];
 
 try {
   await page.goto("http://localhost:3000/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".three-globe canvas", { timeout: 20_000 });
+  await page.waitForFunction(() => document.querySelectorAll(".satellite-option").length === 10, undefined, { timeout: 30_000 });
   const results = [];
   for (const object of objects) {
     await page.getByRole("button", { name: object.button, exact: true }).click();

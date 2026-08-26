@@ -42,17 +42,17 @@ function sendPageView(pathname: string) {
 
 /**
  * A tag é carregada uma única vez por documento e só depois da escolha
- * explícita de publicidade/medição no banner de consentimento.
+ * explícita de medição no banner de consentimento.
  */
 export function GoogleAnalytics() {
   const { preferences } = useConsent();
   const [location] = useLocation();
 
   useEffect(() => {
-    if (!preferences?.advertising) return;
+    if (!preferences?.analytics) return;
     loadGoogleAnalytics();
     sendPageView(location);
-  }, [location, preferences?.advertising]);
+  }, [location, preferences?.analytics]);
 
   return null;
 }

@@ -1,5 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getGlobeFocusRotation } from "@/lib/globeFocus";
 import type { Texture } from "three";
 import { AdditiveBlending, BackSide, Color, DoubleSide, Group, MathUtils, MeshStandardMaterial, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector3 } from "three";
 
@@ -348,34 +349,48 @@ function OrbitControls({ groupRef, onInteract }: { groupRef: React.RefObject<Gro
 // ─── Globe Scene ───────────────────────────────────────────────────────
 // TWO nested groups to prevent rotation conflicts:
 //   outerGroup ← OrbitControls (drag, inertia, auto-rotate)
-//   innerGroup ← satellite focus transition (lerp to longitude)
+//   innerGroup ← satellite focus transition (lerp to latitude/longitude)
 function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition }) {
   const outerGroup = useRef<Group>(null);
   const innerGroup = useRef<Group>(null);
   const selected = markers.find(m => m.id === selectedId);
-  const targetRotation = selected ? MathUtils.degToRad(-selected.longitude) : 0;
-  const transition = useRef({ from: targetRotation, to: targetRotation, startedAt: 0 });
+  const targetRotation = selected ? getGlobeFocusRotation(selected.latitude, selected.longitude) : { rotationX: 0, rotationY: 0 };
+  const transition = useRef({ fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, startedAt: 0 });
   const invalidate = useThree(state => state.invalidate);
 
   useEffect(() => {
     if (!innerGroup.current) return;
+    const currentX = innerGroup.current.rotation.x;
     const currentY = innerGroup.current.rotation.y;
-    transition.current = { from: currentY, to: targetRotation, startedAt: performance.now() };
-  }, [targetRotation]);
+    transition.current = {
+      fromX: currentX,
+      fromY: currentY,
+      toX: targetRotation.rotationX,
+      toY: targetRotation.rotationY,
+      startedAt: performance.now(),
+    };
+  }, [targetRotation.rotationX, targetRotation.rotationY]);
 
   useFrame(() => {
     if (!innerGroup.current) return;
     const elapsed = Math.min(1, (performance.now() - transition.current.startedAt) / FOCUS_DURATION_MS);
     if (elapsed < 1) {
       const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
-      innerGroup.current.rotation.y = MathUtils.lerp(transition.current.from, transition.current.to, eased);
+      innerGroup.current.rotation.x = MathUtils.lerp(transition.current.fromX, transition.current.toX, eased);
+      innerGroup.current.rotation.y = MathUtils.lerp(transition.current.fromY, transition.current.toY, eased);
       invalidate();
     }
   });
 
   const handleInteract = useCallback(() => {
     if (innerGroup.current) {
-      transition.current = { from: innerGroup.current.rotation.y, to: innerGroup.current.rotation.y, startedAt: performance.now() };
+      transition.current = {
+        fromX: innerGroup.current.rotation.x,
+        fromY: innerGroup.current.rotation.y,
+        toX: innerGroup.current.rotation.x,
+        toY: innerGroup.current.rotation.y,
+        startedAt: performance.now(),
+      };
     }
   }, []);
 
@@ -434,7 +449,10 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
       data-is-transitioning={isTransitioning}
       data-marker-count={markers.length}
       data-marker-geometry={markerGeometry}
+      data-focus-latitude={selectedMarker?.latitude ?? 0}
       data-focus-longitude={selectedMarker?.longitude ?? 0}
+      data-focus-rotation-x={selectedMarker ? getGlobeFocusRotation(selectedMarker.latitude, selectedMarker.longitude).rotationX : 0}
+      data-focus-rotation-y={selectedMarker ? getGlobeFocusRotation(selectedMarker.latitude, selectedMarker.longitude).rotationY : 0}
       data-focus-duration={FOCUS_DURATION_MS}
       data-reduced-motion={reducedMotion}
       aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}

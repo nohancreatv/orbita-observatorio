@@ -279,8 +279,10 @@ export default function Home() {
         <div className="footer-grid">
           <div className="footer-brand">
             <a href="#inicio" className="footer-logo" aria-label="Órbita, início"><img src="/assets/orbita-logo_99dcd0cb.svg" alt="" /><span>órbita</span></a>
-            <p className="footer-tagline">Um pequeno observatório para grandes distâncias. Dados orbitais públicos transformados em experiência visual.</p>
-            <div className="footer-links"><button type="button" onClick={clearPreferences}>preferências de publicidade</button></div>
+            <span className="footer-kicker">instrumento público · atualização contínua</span>
+            <p className="footer-tagline">Um pequeno observatório para grandes distâncias. Dados orbitais públicos transformados em experiência visual e educativa.</p>
+            <div className="footer-brand__meta"><span><Radio size={13} aria-hidden="true" /> {allSnapshots.length || "—"} objetos ativos</span><span><Clock3 size={13} aria-hidden="true" /> {currentTime} local</span></div>
+            <div className="footer-links"><button type="button" onClick={clearPreferences}>preferências de publicidade</button><a href="/fontes">como usamos os dados <ArrowUpRight size={13} aria-hidden="true" /></a></div>
           </div>
           <div className="footer-nav">
             <div className="footer-nav-group">
@@ -293,22 +295,29 @@ export default function Home() {
             </nav>
           </div>
           <div className="footer-nav-group">
-            <span className="footer-nav-title">Curiosidades</span>
+              <span className="footer-nav-title">Exploração</span>
             <nav aria-label="Curiosidades e dados">
               <a href="#lancamentos">próximos lançamentos</a>
               <a href="#curiosidade">curiosidade do dia</a>
               <a href="#condicoes">condições do céu</a>
+              <a href="#fontes">metodologia e limites</a>
             </nav>
           </div>
           <div className="footer-nav-group">
-            <span className="footer-nav-title">Legal</span>
+              <span className="footer-nav-title">Transparência</span>
             <nav aria-label="Links legais">
               <a href="/privacidade">privacidade</a>
               <a href="/termos">termos de uso</a>
               <a href="/fontes">fontes e limites</a>
+              <button type="button" className="footer-text-btn" onClick={clearPreferences}>preferências de publicidade</button>
             </nav>
           </div>
           </div>
+        </div>
+        <div className="footer-console" aria-label="Resumo da leitura orbital">
+          <div className="footer-console__signal"><span className="footer-status-dot" aria-hidden="true" /><span>canal orbital ativo</span></div>
+          <div className="footer-console__data"><strong>{statusMessage}</strong><span>Foco atual: {selectedShortName} · {snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "coordenadas em leitura"}</span></div>
+          <a href="#inicio" className="footer-console__link">voltar ao globo <ArrowUpRight size={14} aria-hidden="true" /></a>
         </div>
         <div className="footer-status">
           <div className="footer-status-row">

@@ -3,6 +3,10 @@ import { ArrowLeft, Database } from "lucide-react";
 const sources = [
   ["Where the ISS at?", "Posição, velocidade, altitude e iluminação da ISS.", "https://wheretheiss.at/w/developer"],
   ["CelesTrak", "Elementos orbitais públicos propagados para Hubble, Tiangong, NOAA 19, NOAA 20, NOAA 21, Sentinel-1A, Landsat 9, Terra e Aqua.", "https://celestrak.org/NORAD/documentation/gp-data-formats.php"],
+  ["NASA / NOAA JPSS", "Imagens de referência dos satélites meteorológicos NOAA 20 (JPSS-1) e NOAA 21 (JPSS-2).", "https://science.nasa.gov/mission/jpss/"],
+  ["ESA Sentinel-1", "Imagem de referência do radar de observação da Terra Sentinel-1A.", "https://www.esa.int/Applications/Observing_the_Earth/Copernicus/Sentinel-1/Time_to_say_goodbye_to_Sentinel-1A"],
+  ["NASA / USGS Landsat", "Imagem de referência do satélite de observação da Terra Landsat 9.", "https://www.usgs.gov/landsat-missions/landsat-9"],
+  ["NASA Earth Science", "Imagens de referência dos satélites Terra (EOS AM-1) e Aqua (EOS PM-1).", "https://earthobservatory.nasa.gov/features/Orbits"],
   ["NASA EPIC", "Fotografias diárias da Terra capturadas pelo satélite DSCOVR a 1,5 milhão de km.", "https://epic.gsfc.nasa.gov/"],
   ["NASA DONKI", "Alertas de clima espacial: erupções solares, ejeções de massa coronal e tempestades geomagnéticas.", "https://api.nasa.gov/"],
   ["NASA NeoWs", "Asteroides e objetos próximos da Terra com dados de diâmetro, velocidade e distância.", "https://neo.jpl.nasa.gov/"],

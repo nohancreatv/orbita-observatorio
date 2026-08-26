@@ -11,7 +11,7 @@ const CLOUD_MAP = "/assets/earth-clouds-atlas_8c506c86.png";
 const FOCUS_DURATION_MS = 500;
 const ROTATION_SENSITIVITY = 0.006;
 const INERTIA_DAMPING = 0.93;
-const AUTO_ROTATE_SPEED = 0.0004;
+const AUTO_ROTATE_SPEED = 0.00085;
 const AUTO_ROTATE_DELAY_MS = 4000;
 const MAX_TILT = Math.PI / 3;
 
@@ -171,9 +171,9 @@ function Atmosphere() {
 }
 
 function GlobeOrbitRing() {
-  return <mesh rotation={[MathUtils.degToRad(66), MathUtils.degToRad(-8), MathUtils.degToRad(18)]} renderOrder={3}>
-    <torusGeometry args={[1.16, 0.012, 8, 96]} />
-    <meshBasicMaterial color="#62d8ff" transparent opacity={0.42} blending={AdditiveBlending} depthWrite={false} />
+  return <mesh rotation={[MathUtils.degToRad(64), MathUtils.degToRad(-8), MathUtils.degToRad(18)]}>
+    <torusGeometry args={[1.095, 0.007, 8, 96]} />
+    <meshBasicMaterial color="#55cfff" transparent opacity={0.28} blending={AdditiveBlending} depthWrite={false} />
   </mesh>;
 }
 

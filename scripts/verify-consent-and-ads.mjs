@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await context.newPage();
 
@@ -13,7 +13,7 @@ try {
     adRequestsPaused: document.documentElement.dataset.adsRequests === "paused",
     slotStates: [...document.querySelectorAll("[data-ad-slot]")].map(element => element.getAttribute("data-ad-consent")),
   }));
-  if (!beforeConsent.adsScriptLoaded || !beforeConsent.adRequestsPaused || beforeConsent.slotStates.some(state => state !== "denied")) throw new Error(`Publicidade antecipada: ${JSON.stringify(beforeConsent)}`);
+  if (beforeConsent.adsScriptLoaded || !beforeConsent.adRequestsPaused || beforeConsent.slotStates.some(state => state !== "denied")) throw new Error(`Publicidade antecipada: ${JSON.stringify(beforeConsent)}`);
 
   await page.getByRole("button", { name: "aceitar publicidade" }).click();
   await page.waitForFunction(() => Boolean(document.getElementById("orbita-adsense-script")), { timeout: 10_000 });

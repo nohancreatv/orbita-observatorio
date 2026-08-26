@@ -134,6 +134,21 @@ type ApodProviderData = {
   copyright?: string;
 };
 
+type NasaImageLibraryItem = {
+  data?: Array<{
+    nasa_id?: string;
+    title?: string;
+    description?: string;
+    date_created?: string;
+    media_type?: string;
+  }>;
+  links?: Array<{ href?: string; rel?: string; render?: string }>;
+};
+
+type NasaImageLibraryProviderData = {
+  collection?: { items?: NasaImageLibraryItem[] };
+};
+
 type WeatherProviderData = {
   current?: { time?: string; cloud_cover?: number; visibility?: number; weather_code?: number };
   timezone_abbreviation?: string;
@@ -437,10 +452,10 @@ function nasaFallbackStory(date = new Date().toISOString().slice(0, 10)): SpaceS
   return {
     title: "O arquivo do cosmos está em pausa.",
     date,
-    explanation: "A NASA Open APIs não respondeu agora. O rastreamento orbital continua disponível e esta leitura pode ser atualizada novamente mais tarde.",
+    explanation: "As fontes astronômicas públicas não responderam agora. O rastreamento orbital continua disponível e esta leitura pode ser atualizada novamente mais tarde.",
     imageUrl: null,
-    credit: "NASA Open APIs",
-    sourceUrl: "https://api.nasa.gov/",
+    credit: "Fontes públicas NASA",
+    sourceUrl: "https://images.nasa.gov/",
   };
 }
 
@@ -451,20 +466,67 @@ function isRateLimitError(error: unknown) {
   return error instanceof Error && (error.message.endsWith(": 429") || error.message.includes("429"));
 }
 
+function cleanStoryText(value: string | undefined, fallback: string) {
+  return value?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 560) || fallback;
+}
+
+async function getNasaImageLibraryStory(dateKey: string): Promise<SpaceStory> {
+  return withCache(`nasa:images:${dateKey}`, 24 * 60 * 60_000, async () => {
+    const url = new URL("https://images-api.nasa.gov/search");
+    url.searchParams.set("q", "space astronomy cosmos");
+    url.searchParams.set("media_type", "image");
+    url.searchParams.set("page_size", "50");
+    const data = await fetchJson<NasaImageLibraryProviderData>(url.toString(), 8000);
+    const candidates = (data.collection?.items || []).map(item => {
+      const record = item.data?.find(entry => entry.media_type === "image") || item.data?.[0];
+      const imageLink = item.links?.find(link => link.render === "image" && link.rel === "canonical") || item.links?.find(link => link.render === "image");
+      return {
+        id: record?.nasa_id,
+        title: record?.title,
+        date: record?.date_created?.slice(0, 10),
+        explanation: record?.description,
+        imageUrl: safeNasaImage(imageLink?.href),
+      };
+    }).filter(candidate => candidate.id && candidate.title && candidate.imageUrl);
+
+    if (!candidates.length) throw new Error("A NASA Image Library não retornou imagens utilizáveis");
+    const hash = dateKey.split("").reduce((total, character) => total + character.charCodeAt(0), 0);
+    const selected = candidates[hash % candidates.length];
+    return {
+      title: selected.title!.slice(0, 160),
+      date: selected.date || dateKey,
+      explanation: cleanStoryText(selected.explanation, "Uma imagem selecionada do arquivo público da NASA para acompanhar a leitura do cosmos."),
+      imageUrl: selected.imageUrl,
+      credit: "NASA Image and Video Library",
+      sourceUrl: `https://images.nasa.gov/details/${encodeURIComponent(selected.id!)}`,
+    };
+  });
+}
+
 export async function getSpaceStory(): Promise<SpaceStory> {
   const dateKey = new Date().toISOString().slice(0, 10);
   const fallback = latestSpaceStory?.date === dateKey ? latestSpaceStory : nasaFallbackStory(dateKey);
+  const apiKey = process.env.NASA_API_KEY?.trim();
+
+  if (!apiKey) {
+    try {
+      const story = await getNasaImageLibraryStory(dateKey);
+      latestSpaceStory = story;
+      return story;
+    } catch {
+      return fallback;
+    }
+  }
+
   if (nasaRetryAfter > Date.now()) return fallback;
 
   try {
     const story = await withCache(`nasa:apod:${dateKey}`, 6 * 60 * 60_000, async () => {
-      const apiKey = process.env.NASA_API_KEY;
-      if (!apiKey?.trim()) return fallback;
       const data = await fetchJson<ApodProviderData>(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(apiKey)}`, 8000);
       return {
         title: data.title?.slice(0, 160) || "Imagem astronômica do dia",
         date: data.date || dateKey,
-        explanation: data.explanation?.replace(/\s+/g, " ").trim().slice(0, 560) || "A NASA não forneceu uma explicação para esta entrada.",
+        explanation: cleanStoryText(data.explanation, "A NASA não forneceu uma explicação para esta entrada."),
         imageUrl: data.media_type === "image" ? safeNasaImage(data.url) : null,
         credit: data.copyright?.slice(0, 160) || "NASA",
         sourceUrl: "https://api.nasa.gov/",
@@ -475,7 +537,13 @@ export async function getSpaceStory(): Promise<SpaceStory> {
   } catch (error) {
     if (isRateLimitError(error)) nasaRetryAfter = Date.now() + 15 * 60_000;
     console.warn(`[NASA APOD] Fonte temporariamente indisponível${isRateLimitError(error) ? " (429)" : ""}.`);
-    return fallback;
+    try {
+      const story = await getNasaImageLibraryStory(dateKey);
+      latestSpaceStory = story;
+      return story;
+    } catch {
+      return fallback;
+    }
   }
 }
 

@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import type { AppRouter } from "../../../server/routers";
 import { EarthGlobe } from "@/components/EarthGlobe";
+import { AdSlot } from "@/components/AdSlot";
+import { useConsent } from "@/contexts/ConsentContext";
 import { trpc } from "@/lib/trpc";
 import "../multi-orbit.css";
 
@@ -85,6 +87,7 @@ function getVisibilityCopy(visibility?: string) {
 }
 
 export default function Home() {
+  const { clearPreferences } = useConsent();
   const [selectedSatellite, setSelectedSatellite] = useState<SatelliteId>("iss");
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [isLocating, setIsLocating] = useState(false);
@@ -201,6 +204,9 @@ export default function Home() {
   return (
     <main className="observatory-shell">
       <div className="star-surface" aria-hidden="true" />
+      <div className="observatory-layout">
+        <aside className="ad-rail ad-rail--left" aria-label="Publicidade lateral esquerda"><div className="ad-rail__inner"><AdSlot placement="sidebar-left" /></div></aside>
+        <div className="observatory-content">
       <header className="site-header">
         <a href="#inicio" className="brand-mark" aria-label="Órbita, início"><img src="/assets/orbita-logo_99dcd0cb.svg" alt="" className="brand-symbol" /><span>órbita</span></a>
         <div className="header-meta"><span className="signal-dot" aria-hidden="true" /><span>observatório orbital</span><span className="meta-divider" /><time dateTime={clock.toISOString()}>{currentTime} local</time></div>
@@ -250,6 +256,8 @@ export default function Home() {
         <button type="button" className="refresh-button" onClick={() => allSnapshotsQuery.refetch()} disabled={allSnapshotsQuery.isFetching} aria-label="Atualizar a telemetria"><RefreshCw size={18} className={allSnapshotsQuery.isFetching ? "spin" : ""} aria-hidden="true" /></button>
       </section>
 
+      <AdSlot placement="feed-mobile" />
+
       <section className="ground-location-section" aria-labelledby="ground-title"><div className="ground-location-title"><p className="eyebrow"><MapPin size={15} aria-hidden="true" /> Da coordenada ao território</p><h2 id="ground-title">Onde está <em>{selectedShortName}</em> neste instante?</h2></div><div className="ground-location-card"><span className="location-label">ponto suborbital aproximado</span><strong>{snapshot?.groundLocation.label || "identificando cidade e país…"}</strong><div className="location-coordinates">{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "—"}</div><p>{snapshot?.groundLocation.isOceanOrRemote ? "Este ponto pode estar sobre oceano, áreas remotas ou uma região onde uma cidade não foi identificada." : "A localização indica o ponto da superfície terrestre mais diretamente abaixo do satélite; não representa uma rota de sobrevoo visível."}</p></div><a href="#fontes" className="source-link ground-source-link">como lemos o ponto terrestre <ArrowUpRight size={16} aria-hidden="true" /></a></section>
 
       <section id="passagem" className="passage-section" aria-labelledby="passage-title"><div className="passage-art" aria-hidden="true"><img src="/assets/iss-passage-panel_d049613e.jpg" alt="" /><div className="art-annotation annotation-one">linha de passagem</div><div className="art-annotation annotation-two">horizonte local</div></div><div className="passage-copy"><p className="eyebrow"><Sparkles size={15} aria-hidden="true" /> O seu horizonte</p><h2 id="passage-title">A próxima chance de ver a ISS começa pela sua cidade.</h2>{userLocation ? <div className="passage-result"><div className="location-line"><MapPin size={18} aria-hidden="true" /><span>{userLocation.label}</span></div>{selectedSatellite !== "iss" ? <p className="result-detail">A previsão local de passagem é calculada para a ISS. Selecione-a na constelação para consultar o seu horizonte.</p> : prediction ? <><p className={proximityState ? "result-status is-good" : "result-status"}>{proximityState ? "Boa aproximação prevista" : "Passagem mais próxima no período"}</p><strong className="passage-time">{formatTimeFromNow(prediction.timestamp)}</strong><p className="result-detail">A ISS deve passar a cerca de {formatNumber(prediction.distance)} km da sua posição, por volta de {formatDate(prediction.timestamp)}.</p></> : <p className="result-detail">Estamos consultando a rota das próximas duas horas.</p>}</div> : <div className="passage-empty"><p>Conte onde você está e calcularemos a aproximação mais promissora da ISS nas próximas duas horas.</p><button type="button" className="text-button" onClick={requestLocation}>definir meu horizonte <ArrowUpRight size={16} aria-hidden="true" /></button></div>}<p className="visibility-caveat">A observação a olho nu depende também da iluminação solar, da elevação e das condições de nuvens.</p></div></section>
@@ -271,6 +279,7 @@ export default function Home() {
           <div className="footer-brand">
             <a href="#inicio" className="footer-logo" aria-label="Órbita, início"><img src="/assets/orbita-logo_99dcd0cb.svg" alt="" /><span>órbita</span></a>
             <p className="footer-tagline">Um pequeno observatório para grandes distâncias. Dados orbitais públicos transformados em experiência visual.</p>
+            <div className="footer-links"><button type="button" onClick={clearPreferences}>preferências de publicidade</button></div>
           </div>
           <div className="footer-nav">
             <div className="footer-nav-group">
@@ -316,6 +325,9 @@ export default function Home() {
           <a href="#inicio" className="footer-back-top" aria-label="Voltar ao topo">↑ voltar ao topo</a>
         </div>
       </footer>
+        </div>
+        <aside className="ad-rail ad-rail--right" aria-label="Publicidade lateral direita"><div className="ad-rail__inner"><AdSlot placement="sidebar-right" /></div></aside>
+      </div>
     </main>
   );
 }

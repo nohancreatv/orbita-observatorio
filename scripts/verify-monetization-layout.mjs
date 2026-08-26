@@ -63,7 +63,7 @@ async function inspectMobile(browser) {
   return result;
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
 try {
   const desktop = await inspectDesktop(browser);
   const mobile = await inspectMobile(browser);

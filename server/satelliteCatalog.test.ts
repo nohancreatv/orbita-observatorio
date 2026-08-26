@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { SATELLITE_CATALOG } from "./orbitService";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getOrbitSnapshot, SATELLITE_CATALOG } from "./orbitService";
+
+const originalFetch = global.fetch;
+
+afterEach(() => {
+  global.fetch = originalFetch;
+  vi.restoreAllMocks();
+});
 
 describe("catálogo de satélites", () => {
   it("mantém dez objetos rastreáveis com IDs NORAD únicos", () => {
@@ -31,5 +38,33 @@ describe("catálogo de satélites", () => {
       expect(satellite.telemetry.endpoint).toContain(`CATNR=${satellite.noradId}`);
       expect(satellite.telemetry.endpoint).toContain("FORMAT=TLE");
     }
+  });
+
+  it("propaga o Landsat 9 a partir de um TLE e resolve seu ponto terrestre", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("celestrak.org")) {
+        return new Response([
+          "LANDSAT 9",
+          "1 49260U 21088A   26237.69043066  .00000222  00000+0  55655-4 0  9991",
+          "2 49260  98.2231 307.0075 0001339 105.3510 254.7836 14.57100759261127",
+        ].join("\n"), { status: 200 });
+      }
+      if (url.includes("bigdatacloud.net")) {
+        return new Response(JSON.stringify({ city: "Flagstaff", countryName: "Estados Unidos", countryCode: "US" }), { status: 200 });
+      }
+      throw new Error(`URL inesperada no teste: ${url}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const snapshot = await getOrbitSnapshot("landsat9");
+
+    expect(snapshot.satellite).toMatchObject({ id: "landsat9", noradId: 49260 });
+    expect(snapshot.sourceUrl).toContain("CATNR=49260");
+    expect(snapshot.groundLocation).toMatchObject({ label: "Flagstaff, Estados Unidos", countryCode: "US" });
+    expect(Number.isFinite(snapshot.latitude)).toBe(true);
+    expect(Number.isFinite(snapshot.longitude)).toBe(true);
+    expect(snapshot.altitude).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

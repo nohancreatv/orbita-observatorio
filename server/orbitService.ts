@@ -242,9 +242,11 @@ async function getIssProviderSnapshot(): Promise<IssProviderData> {
   return withCache("iss:live", 9000, () => fetchJson<IssProviderData>("https://api.wheretheiss.at/v1/satellites/25544", 12_000));
 }
 
-async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): Promise<Omit<OrbitSnapshot, "groundLocation">> {
+type CelesTrakElements = { line1: string; line2: string };
+
+async function getCelesTrakElements(satelliteId: Exclude<SatelliteId, "iss">): Promise<CelesTrakElements> {
   const selected = SATELLITE_CATALOG[satelliteId];
-  return withCache(`tle:${satelliteId}`, 90_000, async () => {
+  return withCache(`tle-elements:${satelliteId}`, 2 * 60 * 60_000, async () => {
     const response = await fetch(selected.telemetry.endpoint, {
       headers: { Accept: "text/plain", "User-Agent": "Orbita-ISS-Observatory/1.0" },
       signal: AbortSignal.timeout(12_000),
@@ -252,34 +254,39 @@ async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): P
     if (!response.ok) throw new Error(`Elementos orbitais indisponíveis: ${response.status}`);
     const lines = (await response.text()).trim().split(/\r?\n/).filter(Boolean);
     if (lines.length < 3) throw new Error("Elementos orbitais inválidos.");
-
-    const satrec = satellite.twoline2satrec(lines[1], lines[2]);
-    const now = new Date();
-    const propagated = satellite.propagate(satrec, now);
-    const pos = propagated.position;
-    const vel = propagated.velocity;
-    if (!pos || !vel || typeof pos === "boolean" || typeof vel === "boolean") {
-      throw new Error("Não foi possível propagar a órbita selecionada.");
-    }
-
-    const gmst = satellite.gstime(now);
-    const geodetic = satellite.eciToGeodetic(pos, gmst);
-    const velocity = Math.sqrt(
-      vel.x ** 2 + vel.y ** 2 + vel.z ** 2,
-    ) * 3600;
-
-    return {
-      satellite: selected,
-      latitude: satellite.degreesLat(geodetic.latitude),
-      longitude: normaliseLongitude(satellite.degreesLong(geodetic.longitude)),
-      altitude: Math.max(0, geodetic.height),
-      velocity,
-      visibility: "estimativa orbital",
-      footprint: null,
-      timestamp: Math.floor(now.getTime() / 1000),
-      sourceUrl: selected.telemetry.endpoint,
-    };
+    return { line1: lines[1], line2: lines[2] };
   });
+}
+
+async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): Promise<Omit<OrbitSnapshot, "groundLocation">> {
+  const selected = SATELLITE_CATALOG[satelliteId];
+  const { line1, line2 } = await getCelesTrakElements(satelliteId);
+  const satrec = satellite.twoline2satrec(line1, line2);
+  const now = new Date();
+  const propagated = satellite.propagate(satrec, now);
+  const pos = propagated.position;
+  const vel = propagated.velocity;
+  if (!pos || !vel || typeof pos === "boolean" || typeof vel === "boolean") {
+    throw new Error("Não foi possível propagar a órbita selecionada.");
+  }
+
+  const gmst = satellite.gstime(now);
+  const geodetic = satellite.eciToGeodetic(pos, gmst);
+  const velocity = Math.sqrt(
+    vel.x ** 2 + vel.y ** 2 + vel.z ** 2,
+  ) * 3600;
+
+  return {
+    satellite: selected,
+    latitude: satellite.degreesLat(geodetic.latitude),
+    longitude: normaliseLongitude(satellite.degreesLong(geodetic.longitude)),
+    altitude: Math.max(0, geodetic.height),
+    velocity,
+    visibility: "estimativa orbital",
+    footprint: null,
+    timestamp: Math.floor(now.getTime() / 1000),
+    sourceUrl: selected.telemetry.endpoint,
+  };
 }
 
 export async function getOrbitSnapshot(satelliteId: SatelliteId): Promise<OrbitSnapshot> {

@@ -24,11 +24,13 @@ try {
       description: document.querySelector('meta[name="description"]')?.getAttribute("content"),
       canonical: document.querySelector('link[rel="canonical"]')?.getAttribute("href"),
       ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content"),
+      googleVerification: document.querySelector('meta[name="google-site-verification"]')?.getAttribute("content"),
+      gaScriptCount: document.querySelectorAll('script[src*="googletagmanager.com/gtag/js?id=G-4EQ06VWWVE"]').length,
       h1Count: document.querySelectorAll("h1").length,
       unnamedButtons: [...document.querySelectorAll("button")].filter(button => !(button.textContent || "").trim() && !button.getAttribute("aria-label")).length,
       xRobotsTag: null,
     }));
-    if (!response?.ok() || metadata.title !== title || metadata.lang !== "pt-BR" || !metadata.description || !metadata.canonical?.startsWith(`${siteOrigin}/`) || metadata.ogTitle !== title || metadata.h1Count !== 1 || metadata.unnamedButtons !== 0) throw new Error(`Rota inválida ${path}: ${JSON.stringify({ status: response?.status(), metadata })}`);
+    if (!response?.ok() || metadata.title !== title || metadata.lang !== "pt-BR" || !metadata.description || !metadata.canonical?.startsWith(`${siteOrigin}/`) || metadata.ogTitle !== title || metadata.googleVerification !== "mU6p9Tzv0GcPkaLK6tLc5C0eIQPUwZJHYnfk51XnnVU" || metadata.gaScriptCount !== 1 || metadata.h1Count !== 1 || metadata.unnamedButtons !== 0) throw new Error(`Rota inválida ${path}: ${JSON.stringify({ status: response?.status(), metadata })}`);
     routeResults.push({ path, status: response.status(), title: metadata.title });
   }
 
@@ -43,24 +45,25 @@ try {
   const recovery = await page.evaluate(() => ({ copy: document.body.textContent, stackExposed: Boolean(document.querySelector("pre")), reloadControl: Boolean(document.querySelector("button")), consentVisible: Boolean(document.querySelector(".cookie-consent")) }));
   if (!recovery.copy.includes("interferência") || recovery.stackExposed || !recovery.reloadControl || recovery.consentVisible) throw new Error(`Recuperação de erro inválida: ${JSON.stringify(recovery)}`);
 
-  const [sitemapResponse, manifestResponse, robotsResponse] = await Promise.all([page.request.get(`${baseUrl}/sitemap.xml`), page.request.get(`${baseUrl}/site.webmanifest`), page.request.get(`${baseUrl}/robots.txt`)]);
+  const [sitemapResponse, manifestResponse, robotsResponse, verificationResponse] = await Promise.all([page.request.get(`${baseUrl}/sitemap.xml`), page.request.get(`${baseUrl}/site.webmanifest`), page.request.get(`${baseUrl}/robots.txt`), page.request.get(`${baseUrl}/google47c5538506929de3.html`)]);
   const sitemap = await sitemapResponse.text();
   const manifest = await manifestResponse.json();
   const robots = await robotsResponse.text();
-  if (!sitemapResponse.ok() || !manifestResponse.ok() || !robotsResponse.ok() || !sitemap.includes(`${siteOrigin}/`) || manifest.start_url !== "/" || manifest.scope !== "/" || !robots.includes(`Sitemap: ${siteOrigin}/sitemap.xml`) || robots.includes("Disallow: /")) throw new Error("Ativos públicos de SEO inválidos.");
+  const verificationFile = await verificationResponse.text();
+  if (!sitemapResponse.ok() || !manifestResponse.ok() || !robotsResponse.ok() || !verificationResponse.ok() || verificationFile.trim() !== "google-site-verification: google47c5538506929de3.html" || !sitemap.includes(`${siteOrigin}/`) || manifest.start_url !== "/" || manifest.scope !== "/" || !robots.includes(`Sitemap: ${siteOrigin}/sitemap.xml`) || robots.includes("Disallow: /")) throw new Error("Ativos públicos de SEO inválidos.");
 
   const rawHome = await page.request.get(`${baseUrl}/`);
   const rawPrivacy = await page.request.get(`${baseUrl}/privacidade`);
   const rawNotFound = await page.request.get(`${baseUrl}/rota-inexistente`);
   const [rawHomeHtml, rawPrivacyHtml, rawNotFoundHtml] = await Promise.all([rawHome.text(), rawPrivacy.text(), rawNotFound.text()]);
   const rawHeaders = [rawHome, rawPrivacy, rawNotFound].map(response => response.headers());
-  if (!rawHome.ok() || !rawPrivacy.ok() || rawNotFound.status() !== 404 || rawHeaders.some(headers => headers["x-robots-tag"]) || !rawHomeHtml.includes("<h1>Órbita — ISS acima de você</h1>") || !rawPrivacyHtml.includes("<h1>Política de privacidade</h1>") || !rawPrivacyHtml.includes("<title>Privacidade — Órbita</title>") || !rawPrivacyHtml.includes(`href="${siteOrigin}/privacidade"`) || !rawNotFoundHtml.includes("<h1>Página não encontrada — Órbita</h1>") || !rawNotFoundHtml.includes('content="noindex, nofollow"')) throw new Error("Metadados ou conteúdo HTML pré-renderizado inválidos.");
+  if (!rawHome.ok() || !rawPrivacy.ok() || rawNotFound.status() !== 404 || rawHeaders.some(headers => headers["x-robots-tag"]) || !rawHomeHtml.includes("<h1>Órbita — ISS acima de você</h1>") || !rawHomeHtml.includes('name="google-site-verification" content="mU6p9Tzv0GcPkaLK6tLc5C0eIQPUwZJHYnfk51XnnVU"') || !rawHomeHtml.includes('id="orbita-google-analytics"') || !rawPrivacyHtml.includes("<h1>Política de privacidade</h1>") || !rawPrivacyHtml.includes("<title>Privacidade — Órbita</title>") || !rawPrivacyHtml.includes(`href="${siteOrigin}/privacidade"`) || !rawNotFoundHtml.includes("<h1>Página não encontrada — Órbita</h1>") || !rawNotFoundHtml.includes('content="noindex, nofollow"')) throw new Error("Metadados ou conteúdo HTML pré-renderizado inválidos.");
 
   await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "aceitar publicidade" }).click();
   await page.waitForTimeout(350);
-  const analytics = await page.evaluate(() => ({ scriptCount: document.querySelectorAll('script[src*="googletagmanager.com/gtag/js?id=G-4EQ06VWWVE"]').length, dataLayerReady: Array.isArray(window.dataLayer), hasConfig: window.dataLayer?.some(entry => entry[0] === "config" && entry[1] === "G-4EQ06VWWVE") }));
-  if (analytics.scriptCount !== 1 || !analytics.dataLayerReady || !analytics.hasConfig) throw new Error(`Google Analytics inválido: ${JSON.stringify(analytics)}`);
+  const analytics = await page.evaluate(() => ({ scriptCount: document.querySelectorAll('script[src*="googletagmanager.com/gtag/js?id=G-4EQ06VWWVE"]').length, bootstrapCount: document.querySelectorAll('script[src="/google-analytics-bootstrap.js"]').length, dataLayerReady: Array.isArray(window.dataLayer), hasConfig: window.dataLayer?.some(entry => entry[0] === "config" && entry[1] === "G-4EQ06VWWVE") }));
+  if (analytics.scriptCount !== 1 || analytics.bootstrapCount !== 1 || !analytics.dataLayerReady || !analytics.hasConfig) throw new Error(`Google Analytics inválido: ${JSON.stringify(analytics)}`);
 
   console.log(JSON.stringify({ verification: "passed", routeResults, notFoundMeta, recovery: { stackExposed: recovery.stackExposed, reloadControl: recovery.reloadControl }, manifest: { startUrl: manifest.start_url, scope: manifest.scope }, analytics }, null, 2));
 } finally {

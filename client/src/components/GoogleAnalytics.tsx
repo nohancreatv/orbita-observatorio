@@ -41,8 +41,8 @@ function sendPageView(pathname: string) {
 }
 
 /**
- * A tag é carregada uma única vez por documento e só depois da escolha
- * explícita de medição no banner de consentimento.
+ * O script fica uma única vez no head para verificação do Google; pageviews
+ * só são enviados depois da escolha explícita de medição no banner.
  */
 export function GoogleAnalytics() {
   const { preferences } = useConsent();

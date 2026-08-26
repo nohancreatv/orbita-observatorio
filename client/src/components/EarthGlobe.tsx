@@ -453,6 +453,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
   useFrame(() => {
     if (!innerGroup.current || !outerGroup.current) return;
     const elapsed = Math.min(1, (performance.now() - transition.current.startedAt) / FOCUS_DURATION_MS);
+    if (elapsed >= 1) return;
     const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
     innerGroup.current.rotation.x = MathUtils.lerp(transition.current.fromX, transition.current.toX, eased);
     innerGroup.current.rotation.y = MathUtils.lerp(transition.current.fromY, transition.current.toY, eased);
@@ -472,7 +473,9 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
         outerFromY: outerGroup.current?.rotation.y || 0,
         outerToX: outerGroup.current?.rotation.x || 0,
         outerToY: outerGroup.current?.rotation.y || 0,
-        startedAt: performance.now(),
+        // A interação manual já está no estado final: não deixe o loop de foco
+        // reescrever a rotação do drag durante os próximos frames.
+        startedAt: performance.now() - FOCUS_DURATION_MS,
       };
     }
   }, []);

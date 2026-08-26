@@ -18,6 +18,7 @@ try {
   const canvas = page.locator(".three-globe canvas");
   await canvas.waitFor({ timeout: 25_000 });
   await page.waitForFunction(() => document.querySelector(".three-globe")?.getAttribute("data-renderer") === "react-three-fiber", undefined, { timeout: 25_000 });
+  await page.waitForFunction(() => document.querySelector(".three-globe")?.getAttribute("data-marker-count") === "10", undefined, { timeout: 30_000 });
   await page.waitForTimeout(500);
   const before = await globe.screenshot({ type: "png" });
   const frameCountBefore = await page.evaluate(() => window.__orbitFrameCount || 0);

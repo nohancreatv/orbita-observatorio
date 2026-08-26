@@ -152,7 +152,7 @@ function normaliseLongitude(longitude: number) {
 function toGroundLocation(data: ReverseGeocodeData): GroundLocation {
   const city = data.city || data.locality || data.localityInfo?.administrative?.[0]?.name || null;
   const country = data.countryName || null;
-  const isOceanOrRemote = !city && !country;
+  const isOceanOrRemote = !city || !country || /oceano|ocean|mar aberto|open sea|pacific|atlantic|indian ocean/i.test(city || "");
   const label = city && country ? `${city}, ${country}` : city || country || "sobre oceano ou região remota";
   return { city, country, countryCode: data.countryCode || null, label, isOceanOrRemote };
 }
@@ -293,19 +293,33 @@ function safeLaunchImage(url: string | undefined) {
   }
 }
 
+function parseLaunchTime(value: string | undefined) {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
 export async function getUpcomingLaunches(): Promise<UpcomingLaunch[]> {
   return withCache("launches:upcoming", 20 * 60_000, async () => {
-    const data = await fetchJson<LaunchProviderData>("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=3", 12_000);
-    return (data.results || []).map((launch, index) => ({
-      id: launch.id || `launch-${index}`,
-      name: launch.name?.slice(0, 180) || "Lançamento a confirmar",
-      timestamp: launch.net || null,
-      status: launch.status?.name || "horário a confirmar",
-      provider: launch.launch_service_provider?.name || "provedor não informado",
-      location: launch.pad?.location?.name || "local não informado",
-      imageUrl: safeLaunchImage(launch.image?.image_url),
-      sourceUrl: "https://ll.thespacedevs.com/",
-    }));
+    const data = await fetchJson<LaunchProviderData>("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=12", 12_000);
+    const upcoming = (data.results || []).filter(launch => {
+      const timestamp = parseLaunchTime(launch.net);
+      return timestamp === null || timestamp > Date.now();
+    });
+
+    return upcoming
+      .sort((left, right) => (parseLaunchTime(left.net) ?? Number.POSITIVE_INFINITY) - (parseLaunchTime(right.net) ?? Number.POSITIVE_INFINITY))
+      .slice(0, 3)
+      .map((launch, index) => ({
+        id: launch.id || `launch-${index}`,
+        name: launch.name?.slice(0, 180) || "Lançamento a confirmar",
+        timestamp: parseLaunchTime(launch.net) === null ? null : launch.net || null,
+        status: launch.status?.name || "horário a confirmar",
+        provider: launch.launch_service_provider?.name || "provedor não informado",
+        location: launch.pad?.location?.name || "local não informado",
+        imageUrl: safeLaunchImage(launch.image?.image_url),
+        sourceUrl: "https://ll.thespacedevs.com/",
+      }));
   });
 }
 
@@ -348,6 +362,17 @@ export type SpaceStory = {
   sourceUrl: string;
 };
 
+function nasaFallbackStory(date = new Date().toISOString().slice(0, 10)): SpaceStory {
+  return {
+    title: "O arquivo do cosmos está em pausa.",
+    date,
+    explanation: "A NASA Open APIs não respondeu agora. O rastreamento orbital continua disponível e esta leitura pode ser atualizada novamente mais tarde.",
+    imageUrl: null,
+    credit: "NASA Open APIs",
+    sourceUrl: "https://api.nasa.gov/",
+  };
+}
+
 let latestSpaceStory: SpaceStory | null = null;
 let nasaRetryAfter = 0;
 
@@ -355,13 +380,15 @@ function isRateLimitError(error: unknown) {
   return error instanceof Error && (error.message.endsWith(": 429") || error.message.includes("429"));
 }
 
-export async function getSpaceStory(): Promise<SpaceStory | null> {
+export async function getSpaceStory(): Promise<SpaceStory> {
   const dateKey = new Date().toISOString().slice(0, 10);
-  if (nasaRetryAfter > Date.now()) return latestSpaceStory;
+  const fallback = latestSpaceStory?.date === dateKey ? latestSpaceStory : nasaFallbackStory(dateKey);
+  if (nasaRetryAfter > Date.now()) return fallback;
 
   try {
     const story = await withCache(`nasa:apod:${dateKey}`, 6 * 60 * 60_000, async () => {
-      const apiKey = process.env.NASA_API_KEY || "DEMO_KEY";
+      const apiKey = process.env.NASA_API_KEY;
+      if (!apiKey?.trim()) return fallback;
       const data = await fetchJson<ApodProviderData>(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(apiKey)}`, 8000);
       return {
         title: data.title?.slice(0, 160) || "Imagem astronômica do dia",
@@ -377,7 +404,7 @@ export async function getSpaceStory(): Promise<SpaceStory | null> {
   } catch (error) {
     if (isRateLimitError(error)) nasaRetryAfter = Date.now() + 15 * 60_000;
     console.warn(`[NASA APOD] Fonte temporariamente indisponível${isRateLimitError(error) ? " (429)" : ""}.`);
-    return latestSpaceStory;
+    return fallback;
   }
 }
 

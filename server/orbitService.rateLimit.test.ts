@@ -12,8 +12,13 @@ describe("resiliência da curiosidade NASA", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("rate limited", { status: 429 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(getSpaceStory()).resolves.toBeNull();
-    await expect(getSpaceStory()).resolves.toBeNull();
+    await expect(getSpaceStory()).resolves.toMatchObject({
+      title: "O arquivo do cosmos está em pausa.",
+      sourceUrl: "https://api.nasa.gov/",
+    });
+    await expect(getSpaceStory()).resolves.toMatchObject({
+      title: "O arquivo do cosmos está em pausa.",
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

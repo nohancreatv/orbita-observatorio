@@ -21,18 +21,21 @@
 # SPA routes — devem vir DEPOIS dos assets estáticos
 [[redirects]]
   from = "/privacidade"
-  to = "/index.html"
+  to = "/privacidade/index.html"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/termos"
-  to = "/index.html"
+  to = "/termos/index.html"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/fontes"
-  to = "/index.html"
+  to = "/fontes/index.html"
   status = 200
+  force = true
 
 # NÃO usar redirect catch-all /* → 404.html
 # O Netlify já retorna 404 automaticamente para arquivos inexistentes

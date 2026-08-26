@@ -11,12 +11,16 @@ describe("verificação estática do Google AdSense", () => {
     const adsTxt = readFileSync(resolve(root, "client/public/ads.txt"), "utf8");
 
     expect(html).toContain(`<meta name="google-adsense-account" content="${publisherId}"`);
-    expect(html).toContain(`adsbygoogle.js?client=${publisherId}`);
+    expect(html).not.toContain("adsbygoogle.js?client=");
     expect(adsTxt).toContain("google.com, pub-5884730150482896, DIRECT, f08c47fec0942fa0");
   });
 
-  it("inicializa a pausa de solicitações antes do consentimento", () => {
+  it("inicializa a pausa e só referencia o script após uma escolha autorizada", () => {
     const bootstrap = readFileSync(resolve(root, "client/public/adsense-consent-bootstrap.js"), "utf8");
+    const consentContext = readFileSync(resolve(root, "client/src/contexts/ConsentContext.tsx"), "utf8");
+    expect(bootstrap).toContain("window.adsbygoogle = window.adsbygoogle || []");
     expect(bootstrap).toContain("pauseAdRequests = 1");
+    expect(consentContext).toContain("adsbygoogle.js?client=");
+    expect(consentContext).toContain("if (!advertising || !publisherId) return");
   });
 });

@@ -32,13 +32,29 @@ function updateGoogleConsent(advertising: boolean, mode: "default" | "update") {
   });
 }
 
+const ADSENSE_SCRIPT_ID = "orbita-adsense-script";
+
 function updateAdRequestPause(advertising: boolean) {
   const publisherId = import.meta.env.VITE_ADSENSE_PUBLISHER_ID?.trim();
   const ads = (window.adsbygoogle = window.adsbygoogle || []);
   ads.pauseAdRequests = advertising ? 0 : 1;
   document.documentElement.dataset.adsRequests = advertising ? "resumed" : "paused";
 
-  if (advertising && publisherId) window.dispatchEvent(new Event("orbita:adsense-ready"));
+  if (!advertising || !publisherId) return;
+
+  const existingScript = document.getElementById(ADSENSE_SCRIPT_ID);
+  if (existingScript) {
+    window.dispatchEvent(new Event("orbita:adsense-ready"));
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.id = ADSENSE_SCRIPT_ID;
+  script.async = true;
+  script.crossOrigin = "anonymous";
+  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(publisherId)}`;
+  script.addEventListener("load", () => window.dispatchEvent(new Event("orbita:adsense-ready")), { once: true });
+  document.head.append(script);
 }
 
 export function ConsentProvider({ children }: { children: ReactNode }) {

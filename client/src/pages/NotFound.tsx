@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { AlertCircle, Home } from "lucide-react";
 import { TextReveal } from "@/components/TextReveal";
+import { RevealText } from "@/components/RevealText";
 
 export default function NotFound() {
   const [, setLocation] = useLocation();
@@ -14,8 +15,8 @@ export default function NotFound() {
             <AlertCircle size={56} style={{ color: "#ffb38d", position: "relative" }} />
           </div>
         </div>
-        <h1 style={{ color: "#f6f1e7", font: "400 4.5rem/1 'DM Serif Display', serif", letterSpacing: "-.06em", margin: 0 }}>404</h1>
-        <h2 style={{ color: "#d3e1df", font: "400 clamp(1.3rem,2.5vw,1.8rem)/1.1 'DM Serif Display', serif", marginTop: 16, letterSpacing: "-.03em" }}>Trajetória não encontrada</h2>
+        <RevealText as="h1" style={{ color: "#f6f1e7", font: "400 4.5rem/1 'DM Serif Display', serif", letterSpacing: "-.06em", margin: 0 }} segments={[{ text: "404" }]} />
+        <RevealText as="h2" style={{ color: "#d3e1df", font: "400 clamp(1.3rem,2.5vw,1.8rem)/1.1 'DM Serif Display', serif", marginTop: 16, letterSpacing: "-.03em" }} segments={[{ text: "Trajetória não encontrada" }]} />
         <p style={{ color: "#8a9faa", fontSize: ".85rem", lineHeight: 1.7, marginTop: 18, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
           Esta rota não existe no observatório. Pode ter sido movida, removida ou o endereço pode estar incorreto.
         </p>

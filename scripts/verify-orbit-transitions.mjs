@@ -30,6 +30,8 @@ try {
       if (!isTransitioning) return false;
       return {
         longitude: globe?.getAttribute("data-focus-longitude"),
+        focusRotationY: globe?.getAttribute("data-focus-rotation-y-current"),
+        focusProgress: globe?.getAttribute("data-focus-progress"),
         marker: globe?.getAttribute("data-active-marker"),
         transitionFrom: globe?.getAttribute("data-transition-from"),
         transitionTo: globe?.getAttribute("data-transition-to"),
@@ -40,8 +42,13 @@ try {
       };
     }, { from: previous, to: target.id }, { timeout: 5_000 });
     const current = await transitionSnapshot.jsonValue();
-    if (current.marker !== target.id || current.transitionFrom !== previous || current.transitionTo !== target.id || current.isTransitioning !== "true" || current.longitude === beforeLongitude || !current.badge?.includes(target.label) || !current.telemetry?.includes("altitude") || current.telemetry.includes("—") || !current.groundDetails?.includes("superfície") || !current.groundDetails?.includes("retrato")) {
-      throw new Error(`Transição inválida para ${target.label}: ${JSON.stringify({ previous, target, beforeLongitude, current })}`);
+    const focusRotationAtStart = current.focusRotationY;
+    await page.waitForTimeout(140);
+    const focusRotationAtEnd = await page.locator(".three-globe").getAttribute("data-focus-rotation-y-current");
+    const focusMotionChanged = Boolean(focusRotationAtStart && focusRotationAtEnd && focusRotationAtStart !== focusRotationAtEnd);
+    const focusProgressIsActive = Number(current.focusProgress) > 0 && Number(current.focusProgress) < 1;
+    if (current.marker !== target.id || current.transitionFrom !== previous || current.transitionTo !== target.id || current.isTransitioning !== "true" || current.longitude === beforeLongitude || !focusMotionChanged || !focusProgressIsActive || !current.badge?.includes(target.label) || !current.telemetry?.includes("altitude") || current.telemetry.includes("—") || !current.groundDetails?.includes("superfície") || !current.groundDetails?.includes("retrato")) {
+      throw new Error(`Transição inválida para ${target.label}: ${JSON.stringify({ previous, target, beforeLongitude, current, focusRotationAtStart, focusRotationAtEnd })}`);
     }
     await page.waitForFunction(({ expected }) => {
       const globe = document.querySelector(".three-globe");
@@ -49,7 +56,7 @@ try {
     }, { expected: target.id }, { timeout: 3_000 });
     const settled = await page.evaluate(() => ({ from: document.querySelector(".three-globe")?.getAttribute("data-transition-from"), to: document.querySelector(".three-globe")?.getAttribute("data-transition-to"), isTransitioning: document.querySelector(".three-globe")?.getAttribute("data-is-transitioning") }));
     if (settled.from || settled.to !== target.id || settled.isTransitioning !== "false") throw new Error(`Transição não estabilizou para ${target.label}: ${JSON.stringify(settled)}`);
-    results.push({ from: previous, to: target.id, longitudeChanged: current.longitude !== beforeLongitude, animated: current.isTransitioning === "true", marker: current.marker, telemetryUpdated: true, groundDetailsPresent: Boolean(current.groundDetails), settled });
+    results.push({ from: previous, to: target.id, longitudeChanged: current.longitude !== beforeLongitude, focusMotion: { start: focusRotationAtStart, end: focusRotationAtEnd, changed: focusMotionChanged }, animated: current.isTransitioning === "true", marker: current.marker, telemetryUpdated: true, groundDetailsPresent: Boolean(current.groundDetails), settled });
     previous = target.id;
   }
 

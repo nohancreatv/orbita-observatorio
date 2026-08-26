@@ -417,12 +417,13 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
 //   innerGroup ← geographic focus transition (latitude/longitude)
 // During a selection, the outer group returns to neutral so the selected marker
 // cannot inherit a previous drag/auto-rotation offset.
-function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion, onRotationFrame }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition; onRotationFrame?: (rotationY: number) => void }) {
+function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion, onRotationFrame }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition; onRotationFrame?: (rotationY: number, focusRotationY: number, progress: number) => void }) {
   const outerGroup = useRef<Group>(null);
   const innerGroup = useRef<Group>(null);
   const selected = markers.find(m => m.id === selectedId);
   const targetRotation = selected ? getGlobeFocusRotation(selected.latitude, selected.longitude) : { rotationX: 0, rotationY: 0 };
   const transition = useRef({ fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, outerFromX: 0, outerFromY: 0, outerToX: 0, outerToY: 0, startedAt: 0 });
+  const transitionSettled = useRef(true);
   const rotationProbeAt = useRef(0);
   const invalidate = useThree(state => state.invalidate);
 
@@ -436,41 +437,57 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
       innerGroup.current.rotation.set(targetRotation.rotationX, targetRotation.rotationY, 0);
       outerGroup.current?.rotation.set(0, 0, 0);
       transition.current = { fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, outerFromX: 0, outerFromY: 0, outerToX: 0, outerToY: 0, startedAt: performance.now() - FOCUS_DURATION_MS };
+      transitionSettled.current = true;
       return;
     }
     transition.current = {
       fromX: currentX,
       fromY: currentY,
       toX: targetRotation.rotationX,
-      toY: targetRotation.rotationY,
+      // O alvo absoluto podia fazer o globo percorrer o caminho longo (ou quase
+      // não produzir uma mudança perceptível quando a longitude cruzava ±180°).
+      // Mantemos a mesma orientação geográfica, mas escolhemos o arco menor.
+      toY: getShortestRotationTarget(currentY, targetRotation.rotationY),
       outerFromX: outerCurrentX,
       outerFromY: outerCurrentY,
       outerToX: 0,
       outerToY: getShortestRotationTarget(outerCurrentY, 0),
       startedAt: performance.now(),
     };
+    transitionSettled.current = false;
   }, [targetRotation.rotationX, targetRotation.rotationY, reducedMotion]);
 
   useFrame(() => {
     if (!innerGroup.current || !outerGroup.current) return;
-    const elapsed = Math.min(1, (performance.now() - transition.current.startedAt) / FOCUS_DURATION_MS);
-    if (elapsed >= 1) {
-      if (onRotationFrame && performance.now() - rotationProbeAt.current >= 120) {
-        rotationProbeAt.current = performance.now();
-        onRotationFrame(outerGroup.current.rotation.y);
+    const now = performance.now();
+    const progress = Math.min(1, Math.max(0, (now - transition.current.startedAt) / FOCUS_DURATION_MS));
+    if (progress >= 1) {
+      if (!transitionSettled.current) {
+        // Escreve o ponto final uma única vez para não deixar o marker alguns
+        // pixels fora do centro por arredondamento do último frame. Depois
+        // disso, o OrbitControls volta a conduzir o outerGroup e o auto-rotate.
+        innerGroup.current.rotation.x = transition.current.toX;
+        innerGroup.current.rotation.y = transition.current.toY;
+        outerGroup.current.rotation.x = transition.current.outerToX;
+        outerGroup.current.rotation.y = transition.current.outerToY;
+        transitionSettled.current = true;
+      }
+      if (onRotationFrame && now - rotationProbeAt.current >= 80) {
+        rotationProbeAt.current = now;
+        onRotationFrame(outerGroup.current.rotation.y, innerGroup.current.rotation.y, 1);
       }
       return;
     }
-    const eased = elapsed < .5 ? 2 * elapsed * elapsed : 1 - Math.pow(-2 * elapsed + 2, 2) / 2;
+    const eased = progress < .5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
     innerGroup.current.rotation.x = MathUtils.lerp(transition.current.fromX, transition.current.toX, eased);
     innerGroup.current.rotation.y = MathUtils.lerp(transition.current.fromY, transition.current.toY, eased);
     outerGroup.current.rotation.x = MathUtils.lerp(transition.current.outerFromX, transition.current.outerToX, eased);
     outerGroup.current.rotation.y = MathUtils.lerp(transition.current.outerFromY, transition.current.outerToY, eased);
-    if (onRotationFrame && performance.now() - rotationProbeAt.current >= 120) {
-      rotationProbeAt.current = performance.now();
-      onRotationFrame(outerGroup.current.rotation.y);
+    if (onRotationFrame && now - rotationProbeAt.current >= 80) {
+      rotationProbeAt.current = now;
+      onRotationFrame(outerGroup.current.rotation.y, innerGroup.current.rotation.y, progress);
     }
-    if (elapsed < 1) invalidate();
+    invalidate();
   });
 
   const handleInteract = useCallback(() => {
@@ -488,6 +505,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
         // reescrever a rotação do drag durante os próximos frames.
         startedAt: performance.now() - FOCUS_DURATION_MS,
       };
+      transitionSettled.current = true;
     }
   }, []);
 
@@ -537,8 +555,15 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
 
   const markerGeometry = JSON.stringify(markers.map(m => ({ id: m.id, latitude: m.latitude, longitude: m.longitude })));
   const isTransitioning = Boolean(markerTransition.fromId) && !reducedMotion;
-  const handleRotationFrame = useCallback((rotationY: number) => {
-    globeElementRef.current?.setAttribute("data-rotation-y", rotationY.toFixed(6));
+  const handleRotationFrame = useCallback((rotationY: number, focusRotationY: number, progress: number) => {
+    const element = globeElementRef.current;
+    if (!element) return;
+    // `data-rotation-y` continua representando o grupo externo para o gate de
+    // auto-rotate. Os atributos adicionais medem o grupo interno, que é o que
+    // realmente percorre a longitude durante a centralização do satélite.
+    element.setAttribute("data-rotation-y", rotationY.toFixed(6));
+    element.setAttribute("data-focus-rotation-y-current", focusRotationY.toFixed(6));
+    element.setAttribute("data-focus-progress", progress.toFixed(3));
   }, []);
 
   return (

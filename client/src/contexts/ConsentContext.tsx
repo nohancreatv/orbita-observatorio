@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-type ConsentPreferences = { advertising: boolean; updatedAt: string; version: 1 };
+type ConsentPreferences = { advertising: boolean; analytics: boolean; updatedAt: string; version: 1 };
 type AdsbygoogleQueue = unknown[] & { pauseAdRequests?: number };
 type ConsentContextValue = {
   isReady: boolean;
   preferences: ConsentPreferences | null;
-  savePreferences: (advertising: boolean) => void;
+  savePreferences: (preferences: Pick<ConsentPreferences, "advertising" | "analytics">) => void;
   clearPreferences: () => void;
 };
 
@@ -20,14 +20,14 @@ declare global {
   }
 }
 
-function updateGoogleConsent(advertising: boolean, mode: "default" | "update") {
+function updateGoogleConsent(advertising: boolean, analytics: boolean, mode: "default" | "update") {
   window.dataLayer = window.dataLayer || [];
   window.gtag = window.gtag || ((...args: unknown[]) => window.dataLayer?.push(args));
   window.gtag("consent", mode, {
     ad_storage: advertising ? "granted" : "denied",
     ad_user_data: advertising ? "granted" : "denied",
     ad_personalization: advertising ? "granted" : "denied",
-    analytics_storage: "denied",
+    analytics_storage: analytics ? "granted" : "denied",
     ads_data_redaction: !advertising,
   });
 }
@@ -62,13 +62,15 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<ConsentPreferences | null>(null);
 
   useEffect(() => {
-    updateGoogleConsent(false, "default");
+    updateGoogleConsent(false, false, "default");
     updateAdRequestPause(false);
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as ConsentPreferences;
-        if (parsed.version === 1 && typeof parsed.advertising === "boolean") setPreferences(parsed);
+        const parsed = JSON.parse(stored) as Partial<ConsentPreferences>;
+        if (parsed.version === 1 && typeof parsed.advertising === "boolean") {
+          setPreferences({ advertising: parsed.advertising, analytics: parsed.analytics === true, updatedAt: parsed.updatedAt || new Date().toISOString(), version: 1 });
+        }
       }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
@@ -79,12 +81,12 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!preferences) return;
-    updateGoogleConsent(preferences.advertising, "update");
+    updateGoogleConsent(preferences.advertising, preferences.analytics, "update");
     updateAdRequestPause(preferences.advertising);
   }, [preferences]);
 
-  const savePreferences = useCallback((advertising: boolean) => {
-    const next = { advertising, updatedAt: new Date().toISOString(), version: 1 } as const;
+  const savePreferences = useCallback((nextPreferences: Pick<ConsentPreferences, "advertising" | "analytics">) => {
+    const next = { ...nextPreferences, updatedAt: new Date().toISOString(), version: 1 } as const;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setPreferences(next);
   }, []);
@@ -92,7 +94,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   const clearPreferences = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setPreferences(null);
-    updateGoogleConsent(false, "update");
+    updateGoogleConsent(false, false, "update");
     updateAdRequestPause(false);
   }, []);
 

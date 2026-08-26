@@ -7,7 +7,8 @@ import Sources from "@/pages/Sources";
 import Terms from "@/pages/Terms";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { SeoHead } from "./components/SeoHead";
+import { SeoHead } from "@/components/SeoHead";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { ConsentProvider } from "./contexts/ConsentContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -39,6 +40,6 @@ function Router() {
   return <Switch><Route path="/" component={HomeRoute} /><Route path="/privacidade" component={PrivacyRoute} /><Route path="/termos" component={TermsRoute} /><Route path="/fontes" component={SourcesRoute} /><Route path="/404" component={NotFoundRoute} /><Route component={NotFoundRoute} /></Switch>;
 }
 
-function App() { return <ErrorBoundary><DevelopmentCrashProbe /><ThemeProvider defaultTheme="dark"><ConsentProvider><TooltipProvider><Toaster /><CookieConsentBanner /><Router /></TooltipProvider></ConsentProvider></ThemeProvider></ErrorBoundary>; }
+function App() { return <ErrorBoundary><DevelopmentCrashProbe /><ThemeProvider defaultTheme="dark"><ConsentProvider><GoogleAnalytics /><TooltipProvider><Toaster /><CookieConsentBanner /><Router /></TooltipProvider></ConsentProvider></ThemeProvider></ErrorBoundary>; }
 
 export default App;

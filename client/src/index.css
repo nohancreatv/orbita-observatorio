@@ -714,3 +714,6 @@
 .text-reveal.is-visible .stagger-list > :nth-child(6) { transition-delay: 470ms; }
 @media (prefers-reduced-motion: reduce) { .word-reveal__inner, .scroll-reveal, .scroll-reveal--left, .scroll-reveal--right, .stagger-list > * { opacity: 1; transform: none; clip-path: none; transition: none; will-change: auto; } }
 .word-reveal:not(:last-child) { margin-right: .28em; }
+
+.cookie-consent__choices { display: grid; gap: 2px; }
+.cookie-consent__choices .cookie-consent__choice { margin-top: 12px; }

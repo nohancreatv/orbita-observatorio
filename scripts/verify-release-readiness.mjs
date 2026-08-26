@@ -26,6 +26,7 @@ try {
       ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content"),
       h1Count: document.querySelectorAll("h1").length,
       unnamedButtons: [...document.querySelectorAll("button")].filter(button => !(button.textContent || "").trim() && !button.getAttribute("aria-label")).length,
+      xRobotsTag: null,
     }));
     if (!response?.ok() || metadata.title !== title || metadata.lang !== "pt-BR" || !metadata.description || !metadata.canonical?.startsWith(`${siteOrigin}/`) || metadata.ogTitle !== title || metadata.h1Count !== 1 || metadata.unnamedButtons !== 0) throw new Error(`Rota inválida ${path}: ${JSON.stringify({ status: response?.status(), metadata })}`);
     routeResults.push({ path, status: response.status(), title: metadata.title });
@@ -46,14 +47,22 @@ try {
   const sitemap = await sitemapResponse.text();
   const manifest = await manifestResponse.json();
   const robots = await robotsResponse.text();
-  if (!sitemapResponse.ok() || !manifestResponse.ok() || !robotsResponse.ok() || !sitemap.includes(`${siteOrigin}/`) || manifest.start_url !== "/" || manifest.scope !== "/" || !robots.includes("Sitemap:")) throw new Error("Ativos públicos de SEO inválidos.");
+  if (!sitemapResponse.ok() || !manifestResponse.ok() || !robotsResponse.ok() || !sitemap.includes(`${siteOrigin}/`) || manifest.start_url !== "/" || manifest.scope !== "/" || !robots.includes(`Sitemap: ${siteOrigin}/sitemap.xml`) || robots.includes("Disallow: /")) throw new Error("Ativos públicos de SEO inválidos.");
 
+  const rawHome = await page.request.get(`${baseUrl}/`);
   const rawPrivacy = await page.request.get(`${baseUrl}/privacidade`);
   const rawNotFound = await page.request.get(`${baseUrl}/rota-inexistente`);
-  const [rawPrivacyHtml, rawNotFoundHtml] = await Promise.all([rawPrivacy.text(), rawNotFound.text()]);
-  if (!rawPrivacy.ok() || rawNotFound.status() !== 404 || !rawPrivacyHtml.includes("<title>Privacidade — Órbita</title>") || !rawPrivacyHtml.includes(`href="${siteOrigin}/privacidade"`) || !rawNotFoundHtml.includes('content="noindex, nofollow"')) throw new Error("Metadados entregues pelo servidor inválidos.");
+  const [rawHomeHtml, rawPrivacyHtml, rawNotFoundHtml] = await Promise.all([rawHome.text(), rawPrivacy.text(), rawNotFound.text()]);
+  const rawHeaders = [rawHome, rawPrivacy, rawNotFound].map(response => response.headers());
+  if (!rawHome.ok() || !rawPrivacy.ok() || rawNotFound.status() !== 404 || rawHeaders.some(headers => headers["x-robots-tag"]) || !rawHomeHtml.includes("<h1>Órbita — ISS acima de você</h1>") || !rawPrivacyHtml.includes("<h1>Política de privacidade</h1>") || !rawPrivacyHtml.includes("<title>Privacidade — Órbita</title>") || !rawPrivacyHtml.includes(`href="${siteOrigin}/privacidade"`) || !rawNotFoundHtml.includes("<h1>Página não encontrada — Órbita</h1>") || !rawNotFoundHtml.includes('content="noindex, nofollow"')) throw new Error("Metadados ou conteúdo HTML pré-renderizado inválidos.");
 
-  console.log(JSON.stringify({ verification: "passed", routeResults, notFoundMeta, recovery: { stackExposed: recovery.stackExposed, reloadControl: recovery.reloadControl }, manifest: { startUrl: manifest.start_url, scope: manifest.scope } }, null, 2));
+  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "aceitar publicidade" }).click();
+  await page.waitForTimeout(350);
+  const analytics = await page.evaluate(() => ({ scriptCount: document.querySelectorAll('script[src*="googletagmanager.com/gtag/js?id=G-4EQ06VWWVE"]').length, dataLayerReady: Array.isArray(window.dataLayer), hasConfig: window.dataLayer?.some(entry => entry[0] === "config" && entry[1] === "G-4EQ06VWWVE") }));
+  if (analytics.scriptCount !== 1 || !analytics.dataLayerReady || !analytics.hasConfig) throw new Error(`Google Analytics inválido: ${JSON.stringify(analytics)}`);
+
+  console.log(JSON.stringify({ verification: "passed", routeResults, notFoundMeta, recovery: { stackExposed: recovery.stackExposed, reloadControl: recovery.reloadControl }, manifest: { startUrl: manifest.start_url, scope: manifest.scope }, analytics }, null, 2));
 } finally {
   await context.close();
   await browser.close();

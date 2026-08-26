@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium", args: ["--no-sandbox"] });
 const mobileMode = process.env.E2E_MOBILE === "1";
+const baseUrl = process.env.BASE_URL || "http://localhost:3000";
 const page = await browser.newPage({ viewport: mobileMode ? { width: 390, height: 844 } : { width: 1280, height: 720 } });
 const objects = [
   { button: "ISS", id: "iss", label: "ISS" },
@@ -17,7 +18,7 @@ const objects = [
 ];
 
 try {
-  await page.goto("http://localhost:3000/", { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".three-globe canvas", { timeout: 20_000 });
   await page.waitForFunction(() => document.querySelectorAll(".satellite-option").length === 10, undefined, { timeout: 30_000 });
   const results = [];

@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getOrbitSnapshot, SATELLITE_CATALOG } from "./orbitService";
+import { getOrbitSnapshot, getOrbitSnapshots, resetOrbitServiceCacheForTests, SATELLITE_CATALOG } from "./orbitService";
 
 const originalFetch = global.fetch;
 
 afterEach(() => {
   global.fetch = originalFetch;
+  resetOrbitServiceCacheForTests();
   vi.restoreAllMocks();
 });
 
@@ -38,6 +39,27 @@ describe("catálogo de satélites", () => {
       expect(satellite.telemetry.endpoint).toContain(`CATNR=${satellite.noradId}`);
       expect(satellite.telemetry.endpoint).toContain("FORMAT=TLE");
     }
+  });
+
+  it("mantém os dez satélites quando os provedores orbitais estão indisponíveis", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("wheretheiss.at") || url.includes("celestrak.org")) {
+        throw new Error("fonte orbital indisponível");
+      }
+      if (url.includes("bigdatacloud.net")) {
+        return new Response(JSON.stringify({ city: "contingência", countryName: "Brasil", countryCode: "BR" }), { status: 200 });
+      }
+      throw new Error(`URL inesperada no teste: ${url}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const snapshots = await getOrbitSnapshots();
+
+    expect(snapshots).toHaveLength(10);
+    expect(new Set(snapshots.map(snapshot => snapshot.satellite.id)).size).toBe(10);
+    expect(snapshots.every(snapshot => Number.isFinite(snapshot.latitude) && Number.isFinite(snapshot.longitude))).toBe(true);
+    expect(snapshots.every(snapshot => snapshot.visibility === "estimativa orbital")).toBe(true);
   });
 
   it("propaga o Landsat 9 a partir de um TLE e resolve seu ponto terrestre", async () => {

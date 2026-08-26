@@ -191,6 +191,12 @@ type CacheEntry<T> = { value: T; expiresAt: number; staleUntil: number };
 const cache = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
 
+/** Limpa caches entre cenários isolados de teste; o runtime normal nunca chama esta função. */
+export function resetOrbitServiceCacheForTests() {
+  cache.clear();
+  inFlight.clear();
+}
+
 async function withCache<T>(key: string, ttlMs: number, producer: () => Promise<T>, staleMs = Math.max(ttlMs * 4, 60_000)): Promise<T> {
   const cached = cache.get(key) as CacheEntry<T> | undefined;
   const now = Date.now();
@@ -259,6 +265,56 @@ async function getIssProviderSnapshot(): Promise<IssProviderData> {
 
 type CelesTrakElements = { line1: string; line2: string };
 
+// TLEs públicos recentes usados somente como último fallback de disponibilidade.
+// A fonte online continua sendo tentada primeiro; estes elementos impedem que
+// uma falha transitória apague satélites da constelação visual.
+const FALLBACK_TLE_ELEMENTS: Record<SatelliteId, CelesTrakElements> = {
+  iss: {
+    line1: "1 25544U 98067A   26237.66055539  .00007716  00000+0  14485-3 0  9994",
+    line2: "2 25544  51.6329 316.2335 0007673  83.1052 277.0809 15.49625410582525",
+  },
+  hubble: {
+    line1: "1 20580U 90037B   26237.62528960  .00006029  00000+0  18532-3 0  9990",
+    line2: "2 20580  28.4736 325.7338 0001866 182.2613 177.7975 15.31455744799223",
+  },
+  tiangong: {
+    line1: "1 48274U 21035A   26236.77270977  .00015469  00000+0  19527-3 0  9992",
+    line2: "2 48274  41.4680 265.6655 0001614 251.2435 108.8228 15.59231012303878",
+  },
+  noaa19: {
+    line1: "1 33591U 09005A   26189.92327367 -.00000002  00000+0  22819-4 0  9998",
+    line2: "2 33591  98.9512 260.8130 0013169 332.9779  27.0706 14.13477619897556",
+  },
+  noaa20: {
+    line1: "1 43013U 17073A   26237.85305610  .00000042  00000+0  40991-4 0  9999",
+    line2: "2 43013  98.7790 176.7028 0001981  74.1229 286.0165 14.19522795454352",
+  },
+  noaa21: {
+    line1: "1 54234U 22150A   26236.89789988  .00000005  00000+0  22897-4 0  9999",
+    line2: "2 54234  98.7074 174.5360 0002193  31.2755 328.8551 14.19546432196297",
+  },
+  sentinel1a: {
+    line1: "1 39634U 14016A   26237.96212367 -.00000039  00000+0  14167-5 0  9999",
+    line2: "2 39634  98.1588 244.4108 0001414  85.7342 274.4020 14.59751896660194",
+  },
+  landsat9: {
+    line1: "1 49260U 21088A   26237.69043066  .00000222  00000+0  59361-4 0  9997",
+    line2: "2 49260  98.2231 307.0076 0001339 105.3510 254.7836 14.57100759261128",
+  },
+  terra: {
+    line1: "1 25994U 99068A   26237.87787104  .00000296  00000+0  69194-4 0  9992",
+    line2: "2 25994  97.9403 284.6419 0002834  40.1634  70.8131 14.61149167419781",
+  },
+  aqua: {
+    line1: "1 27424U 02022A   26237.91631773  .00000630  00000+0  13496-3 0  9996",
+    line2: "2 27424  98.4352 208.6178 0001818  83.3034 300.1915 14.62178439293461",
+  },
+};
+
+function getFallbackTleElements(satelliteId: SatelliteId) {
+  return FALLBACK_TLE_ELEMENTS[satelliteId];
+}
+
 async function getCelesTrakElements(satelliteId: Exclude<SatelliteId, "iss">): Promise<CelesTrakElements> {
   const selected = SATELLITE_CATALOG[satelliteId];
   return withCache(`tle-elements:${satelliteId}`, 2 * 60 * 60_000, async () => {
@@ -273,9 +329,8 @@ async function getCelesTrakElements(satelliteId: Exclude<SatelliteId, "iss">): P
   });
 }
 
-async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): Promise<Omit<OrbitSnapshot, "groundLocation">> {
+async function propagateTleSnapshot(satelliteId: SatelliteId, { line1, line2 }: CelesTrakElements): Promise<Omit<OrbitSnapshot, "groundLocation">> {
   const selected = SATELLITE_CATALOG[satelliteId];
-  const { line1, line2 } = await getCelesTrakElements(satelliteId);
   const satrec = satellite.twoline2satrec(line1, line2);
   const now = new Date();
   const propagated = satellite.propagate(satrec, now);
@@ -304,27 +359,47 @@ async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">): P
   };
 }
 
-export async function getOrbitSnapshot(satelliteId: SatelliteId): Promise<OrbitSnapshot> {
-  if (satelliteId === "iss") {
-    const iss = await getIssProviderSnapshot();
-    const groundLocation = await resolveGroundLocation(iss.latitude, iss.longitude);
-    return {
-      satellite: SATELLITE_CATALOG.iss,
-      latitude: iss.latitude,
-      longitude: iss.longitude,
-      altitude: iss.altitude,
-      velocity: iss.velocity,
-      visibility: iss.visibility,
-      footprint: iss.footprint,
-      timestamp: iss.timestamp,
-      groundLocation,
-      sourceUrl: SATELLITE_CATALOG.iss.telemetry.endpoint,
-    };
-  }
+async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">) {
+  return propagateTleSnapshot(satelliteId, await getCelesTrakElements(satelliteId));
+}
 
-  const snapshot = await getCelesTrakSnapshot(satelliteId);
+async function getFallbackSnapshot(satelliteId: SatelliteId): Promise<OrbitSnapshot> {
+  const snapshot = await propagateTleSnapshot(satelliteId, getFallbackTleElements(satelliteId));
   const groundLocation = await resolveGroundLocation(snapshot.latitude, snapshot.longitude);
   return { ...snapshot, groundLocation };
+}
+
+export async function getOrbitSnapshot(satelliteId: SatelliteId): Promise<OrbitSnapshot> {
+  if (satelliteId === "iss") {
+    try {
+      const iss = await getIssProviderSnapshot();
+      const groundLocation = await resolveGroundLocation(iss.latitude, iss.longitude);
+      return {
+        satellite: SATELLITE_CATALOG.iss,
+        latitude: iss.latitude,
+        longitude: iss.longitude,
+        altitude: iss.altitude,
+        velocity: iss.velocity,
+        visibility: iss.visibility,
+        footprint: iss.footprint,
+        timestamp: iss.timestamp,
+        groundLocation,
+        sourceUrl: SATELLITE_CATALOG.iss.telemetry.endpoint,
+      };
+    } catch (error) {
+      console.warn(`[Orbit] ISS ao vivo indisponível; usando TLE de contingência.`, error instanceof Error ? error.message : error);
+      return getFallbackSnapshot(satelliteId);
+    }
+  }
+
+  try {
+    const snapshot = await getCelesTrakSnapshot(satelliteId);
+    const groundLocation = await resolveGroundLocation(snapshot.latitude, snapshot.longitude);
+    return { ...snapshot, groundLocation };
+  } catch (error) {
+    console.warn(`[Orbit] ${satelliteId} indisponível no CelesTrak; usando TLE de contingência.`, error instanceof Error ? error.message : error);
+    return getFallbackSnapshot(satelliteId);
+  }
 }
 
 /**

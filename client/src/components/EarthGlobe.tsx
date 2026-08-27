@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getGlobeFocusRotation, getShortestRotationTarget } from "@/lib/globeFocus";
 import type { Texture } from "three";
 import { AdditiveBlending, BackSide, Color, DoubleSide, Group, MathUtils, MeshStandardMaterial, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector3 } from "three";
@@ -213,12 +213,19 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion, 
       // exatamente na linha do horizonte da esfera.
       const frontVisible = worldMarkerPosition.current.dot(worldCameraPosition.current) > 0.03;
       markerVisual.current.visible = frontVisible;
+      const focusProgress = Math.min(1, Math.max(0, (performance.now() - transition.startedAt) / FOCUS_DURATION_MS));
+      const smoothProgress = focusProgress * focusProgress * (3 - 2 * focusProgress);
+      const handoffScale = isEntering ? 0.78 + smoothProgress * 0.22 : isLeaving ? 1.14 - smoothProgress * 0.14 : 1;
+      markerVisual.current.scale.setScalar(handoffScale);
       if (wasFrontVisible.current !== frontVisible) {
         wasFrontVisible.current = frontVisible;
         onVisibilityChange?.(marker.id, frontVisible);
       }
     }
-    if (reducedMotion) return;
+    if (reducedMotion) {
+      markerVisual.current?.scale.setScalar(1);
+      return;
+    }
     if (isLeaving && outgoingRing.current) {
       const p = Math.min(1, (performance.now() - transition.startedAt) / FOCUS_DURATION_MS);
       outgoingRing.current.scale.setScalar(Math.max(.01, 1 - p));
@@ -621,7 +628,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
   const previousSelectedId = useRef(selectedId);
   const [markerTransition, setMarkerTransition] = useState<MarkerTransition>({ fromId: null, toId: selectedId, startedAt: 0 });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const fromId = previousSelectedId.current;
     if (fromId === selectedId) return;
     previousSelectedId.current = selectedId;

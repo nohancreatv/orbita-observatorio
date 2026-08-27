@@ -34,6 +34,9 @@ try {
     rotation: document.querySelector(".three-globe")?.getAttribute("data-focus-longitude"),
     focusRotationYCurrent: document.querySelector(".three-globe")?.getAttribute("data-focus-rotation-y-current"),
     focusProgress: document.querySelector(".three-globe")?.getAttribute("data-focus-progress"),
+    activeScreenX: document.querySelector(".three-globe")?.getAttribute("data-active-screen-x"),
+    activeScreenY: document.querySelector(".three-globe")?.getAttribute("data-active-screen-y"),
+    activeScreenDepth: document.querySelector(".three-globe")?.getAttribute("data-active-screen-depth"),
     rotationDuration: document.querySelector(".three-globe")?.getAttribute("data-focus-duration"),
     reducedMotion: document.querySelector(".three-globe")?.getAttribute("data-reduced-motion"),
     telemetry: document.querySelector(".telemetry-strip")?.textContent?.replace(/\s+/g, " ").trim(),
@@ -51,13 +54,14 @@ try {
   const expectedReducedMotion = process.env.E2E_REDUCED_MOTION === "1" ? "true" : "false";
   const focusMotionChanged = Boolean(focusMotionStart && focusMotionEnd && focusMotionStart !== focusMotionEnd);
   const progressIsActive = Number(focusProgressAtMotion) > 0 && Number(focusProgressAtMotion) < 1;
-  if (after.activeMarker !== "hubble" || !after.title?.includes("Hubble") || !after.imageAlt?.includes("Hubble") || beforeRotation === after.rotation || !focusMotionChanged || !progressIsActive || after.rotationDuration !== "500" || after.reducedMotion !== expectedReducedMotion || settledTransition.from || settledTransition.to !== "hubble" || !hasTelemetry || !hasGroundLocation) {
+  const activeCentered = Math.abs(Number(after.activeScreenX)) < 0.08 && Math.abs(Number(after.activeScreenY)) < 0.08 && Number(after.activeScreenDepth) < 1;
+  if (after.activeMarker !== "hubble" || !after.title?.includes("Hubble") || !after.imageAlt?.includes("Hubble") || beforeRotation === after.rotation || !focusMotionChanged || !progressIsActive || !activeCentered || after.rotationDuration !== "500" || after.reducedMotion !== expectedReducedMotion || settledTransition.from || settledTransition.to !== "hubble" || !hasTelemetry || !hasGroundLocation) {
     throw new Error(`A interação de foco não atualizou todos os elementos: ${JSON.stringify({ beforeRotation, focusMotionStart, focusMotionEnd, focusProgressAtMotion, after, settledTransition })}`);
   }
 
   const screenshotPath = mobileMode ? "/home/ubuntu/webdev-static-assets/hubble-focus-e2e-mobile.png" : "/home/ubuntu/webdev-static-assets/hubble-focus-e2e.png";
   await page.screenshot({ path: screenshotPath, fullPage: false });
-  console.log(JSON.stringify({ verification: "passed", viewport: mobileMode ? "mobile" : "desktop", screenshotPath, beforeRotation, focusMotion: { start: focusMotionStart, end: focusMotionEnd, progressAtMotion: focusProgressAtMotion, changed: focusMotionChanged }, after, transition: { from: "iss", to: "hubble", settled: settledTransition } }, null, 2));
+  console.log(JSON.stringify({ verification: "passed", viewport: mobileMode ? "mobile" : "desktop", screenshotPath, beforeRotation, focusMotion: { start: focusMotionStart, end: focusMotionEnd, progressAtMotion: focusProgressAtMotion, changed: focusMotionChanged }, centered: activeCentered, after, transition: { from: "iss", to: "hubble", settled: settledTransition } }, null, 2));
 } finally {
   await browser.close();
 }

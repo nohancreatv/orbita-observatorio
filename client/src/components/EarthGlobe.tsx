@@ -195,6 +195,7 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }
   const incomingRing = useRef<Group>(null);
   const glowRef = useRef<Group>(null);
   const pulseRef = useRef<Group>(null);
+  const pulseWaveRef = useRef<Group>(null);
   const isLeaving = transition.fromId === marker.id;
   const isEntering = transition.fromId !== null && transition.toId === marker.id;
 
@@ -210,9 +211,18 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }
       incomingRing.current.scale.setScalar(.6 + p * .4);
       invalidate();
     }
-    if (active && pulseRef.current) {
-      const t = performance.now() / 800;
-      pulseRef.current.scale.setScalar(1 + Math.sin(t * Math.PI * 2) * 0.12);
+    if (active) {
+      const now = performance.now();
+      if (pulseRef.current) {
+        const t = now / 800;
+        pulseRef.current.scale.setScalar(1 + Math.sin(t * Math.PI * 2) * 0.12);
+      }
+      if (pulseWaveRef.current) {
+        // O segundo anel se expande continuamente e volta ao início,
+        // destacando o marker sem alterar sua posição nem bloquear o raycast.
+        const cycle = (now % 1400) / 1400;
+        pulseWaveRef.current.scale.setScalar(0.72 + cycle * 0.95);
+      }
     }
     if (active && glowRef.current) {
       const t = performance.now() / 1200;
@@ -236,6 +246,7 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }
       </mesh>
       {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} depthTest={false} side={DoubleSide} /></mesh></group>}
       {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.07, 0.085, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} depthTest={false} side={DoubleSide} /></mesh></group>}
+      {active && <group ref={pulseWaveRef}><mesh><ringGeometry args={[0.058, 0.066, 32]} /><meshBasicMaterial color="#ffd0ba" transparent opacity={0.42} depthTest={false} side={DoubleSide} /></mesh></group>}
       {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.068, 0.082, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} depthTest={false} side={DoubleSide} /></mesh></group>}
       {active && <group ref={glowRef}><MarkerGlow /></group>}
       <mesh><sphereGeometry args={[active ? 0.042 : 0.03, 16, 16]} /><meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} depthTest={false} /></mesh>
@@ -273,6 +284,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
   const prevPointer = useRef({ x: 0, y: 0 });
   const velocity = useRef({ x: 0, y: 0 });
   const activeInput = useRef<"pointer" | "touch" | null>(null);
+  const touchMoved = useRef(false);
   const autoRotate = useRef(true);
   const autoRotateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasFocusActive = useRef(false);
@@ -317,7 +329,10 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
     const onTouchStart = (e: TouchEvent) => {
       if (activeInput.current === "pointer" || e.touches.length !== 1) return;
       activeInput.current = "touch";
-      isDragging.current = true;
+      // Um toque simples deve permanecer um clique R3F, não um drag de zero
+      // pixels. O arraste só começa depois do limiar de movimento.
+      touchMoved.current = false;
+      isDragging.current = false;
       autoRotate.current = false;
       if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
       prevPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -326,10 +341,13 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (activeInput.current !== "touch" || !isDragging.current || !groupRef.current || e.touches.length !== 1) return;
-      e.preventDefault();
+      if (activeInput.current !== "touch" || !groupRef.current || e.touches.length !== 1) return;
       const dx = e.touches[0].clientX - prevPointer.current.x;
       const dy = e.touches[0].clientY - prevPointer.current.y;
+      if (!touchMoved.current && Math.hypot(dx, dy) < 4) return;
+      touchMoved.current = true;
+      isDragging.current = true;
+      e.preventDefault();
       prevPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       velocity.current = { x: dx * ROTATION_SENSITIVITY, y: dy * ROTATION_SENSITIVITY };
       groupRef.current.rotation.y += velocity.current.x;
@@ -342,6 +360,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
     const onTouchEnd = () => {
       if (activeInput.current !== "touch") return;
       isDragging.current = false;
+      touchMoved.current = false;
       activeInput.current = null;
       autoRotateTimer.current = setTimeout(() => { autoRotate.current = true; }, AUTO_ROTATE_DELAY_MS);
     };
@@ -356,6 +375,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
     dom.addEventListener("touchstart", onTouchStart, { passive: false });
     dom.addEventListener("touchmove", onTouchMove, { passive: false });
     dom.addEventListener("touchend", onTouchEnd);
+    dom.addEventListener("touchcancel", onTouchEnd);
 
     return () => {
       if (autoRotateTimer.current) clearTimeout(autoRotateTimer.current);
@@ -368,6 +388,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
       dom.removeEventListener("touchstart", onTouchStart);
       dom.removeEventListener("touchmove", onTouchMove);
       dom.removeEventListener("touchend", onTouchEnd);
+      dom.removeEventListener("touchcancel", onTouchEnd);
     };
   }, [gl, groupRef]);
 
@@ -432,7 +453,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
 //   innerGroup ← geographic focus transition (latitude/longitude)
 // During a selection, the outer group returns to neutral so the selected marker
 // cannot inherit a previous drag/auto-rotation offset.
-function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion, onRotationFrame }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition; onRotationFrame?: (rotationY: number, focusRotationY: number, progress: number) => void }) {
+function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion, onRotationFrame }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition; onRotationFrame?: (rotationY: number, focusRotationY: number, progress: number, activeScreenX: number, activeScreenY: number, activeDepth: number) => void }) {
   const outerGroup = useRef<Group>(null);
   const innerGroup = useRef<Group>(null);
   const selected = markers.find(m => m.id === selectedId);
@@ -440,10 +461,17 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
   const transition = useRef({ fromX: targetRotation.rotationX, fromY: targetRotation.rotationY, toX: targetRotation.rotationX, toY: targetRotation.rotationY, outerFromX: 0, outerFromY: 0, outerToX: 0, outerToY: 0, startedAt: 0 });
   const transitionSettled = useRef(true);
   const rotationProbeAt = useRef(0);
+  const activeWorldPosition = useMemo(() => selected ? toCartesian(selected.latitude, selected.longitude, 1.065) : null, [selected?.latitude, selected?.longitude]);
+  const activeProjectedPosition = useRef(new Vector3());
+  const camera = useThree(state => state.camera);
   const invalidate = useThree(state => state.invalidate);
 
   useEffect(() => {
     if (!innerGroup.current) return;
+    // A fórmula de foco calcula longitude no eixo Y e latitude no eixo X.
+    // O Three.js aplica essa combinação com a ordem XYZ, que coloca qualquer
+    // coordenada selecionada exatamente no eixo frontal da câmera.
+    innerGroup.current.rotation.order = "XYZ";
     const currentX = innerGroup.current.rotation.x;
     const currentY = innerGroup.current.rotation.y;
     const outerCurrentX = outerGroup.current?.rotation.x || 0;
@@ -475,6 +503,25 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
   useFrame(() => {
     if (!innerGroup.current || !outerGroup.current) return;
     const now = performance.now();
+    const reportFrame = (progress: number) => {
+      if (!onRotationFrame || now - rotationProbeAt.current < 80) return;
+      const inner = innerGroup.current;
+      const outer = outerGroup.current;
+      if (!inner || !outer) return;
+      rotationProbeAt.current = now;
+      let screenX = 0;
+      let screenY = 0;
+      let depth = 0;
+      if (activeWorldPosition) {
+        activeProjectedPosition.current.copy(activeWorldPosition);
+        inner.localToWorld(activeProjectedPosition.current);
+        activeProjectedPosition.current.project(camera);
+        screenX = activeProjectedPosition.current.x;
+        screenY = activeProjectedPosition.current.y;
+        depth = activeProjectedPosition.current.z;
+      }
+      onRotationFrame(outer.rotation.y, inner.rotation.y, progress, screenX, screenY, depth);
+    };
     const progress = Math.min(1, Math.max(0, (now - transition.current.startedAt) / FOCUS_DURATION_MS));
     if (progress >= 1) {
       if (!transitionSettled.current) {
@@ -487,10 +534,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
         outerGroup.current.rotation.y = transition.current.outerToY;
         transitionSettled.current = true;
       }
-      if (onRotationFrame && now - rotationProbeAt.current >= 80) {
-        rotationProbeAt.current = now;
-        onRotationFrame(outerGroup.current.rotation.y, innerGroup.current.rotation.y, 1);
-      }
+      reportFrame(1);
       return;
     }
     const eased = progress < .5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
@@ -498,10 +542,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
     innerGroup.current.rotation.y = MathUtils.lerp(transition.current.fromY, transition.current.toY, eased);
     outerGroup.current.rotation.x = MathUtils.lerp(transition.current.outerFromX, transition.current.outerToX, eased);
     outerGroup.current.rotation.y = MathUtils.lerp(transition.current.outerFromY, transition.current.outerToY, eased);
-    if (onRotationFrame && now - rotationProbeAt.current >= 80) {
-      rotationProbeAt.current = now;
-      onRotationFrame(outerGroup.current.rotation.y, innerGroup.current.rotation.y, progress);
-    }
+    reportFrame(progress);
     invalidate();
   });
 
@@ -570,7 +611,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
 
   const markerGeometry = JSON.stringify(markers.map(m => ({ id: m.id, latitude: m.latitude, longitude: m.longitude })));
   const isTransitioning = Boolean(markerTransition.fromId) && !reducedMotion;
-  const handleRotationFrame = useCallback((rotationY: number, focusRotationY: number, progress: number) => {
+  const handleRotationFrame = useCallback((rotationY: number, focusRotationY: number, progress: number, activeScreenX: number, activeScreenY: number, activeDepth: number) => {
     const element = globeElementRef.current;
     if (!element) return;
     // `data-rotation-y` continua representando o grupo externo para o gate de
@@ -579,6 +620,9 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
     element.setAttribute("data-rotation-y", rotationY.toFixed(6));
     element.setAttribute("data-focus-rotation-y-current", focusRotationY.toFixed(6));
     element.setAttribute("data-focus-progress", progress.toFixed(3));
+    element.setAttribute("data-active-screen-x", activeScreenX.toFixed(6));
+    element.setAttribute("data-active-screen-y", activeScreenY.toFixed(6));
+    element.setAttribute("data-active-screen-depth", activeDepth.toFixed(6));
   }, []);
 
   return (
@@ -597,6 +641,10 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
       data-focus-longitude={selectedMarker?.longitude ?? 0}
       data-focus-rotation-x={selectedMarker ? getGlobeFocusRotation(selectedMarker.latitude, selectedMarker.longitude).rotationX : 0}
       data-focus-rotation-y={selectedMarker ? getGlobeFocusRotation(selectedMarker.latitude, selectedMarker.longitude).rotationY : 0}
+      data-focus-rotation-order="XYZ"
+      data-active-screen-x="0"
+      data-active-screen-y="0"
+      data-active-screen-depth="0"
       data-focus-duration={FOCUS_DURATION_MS}
       data-reduced-motion={reducedMotion}
       aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}

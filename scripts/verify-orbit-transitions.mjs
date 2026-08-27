@@ -33,6 +33,9 @@ try {
         longitude: globe?.getAttribute("data-focus-longitude"),
         focusRotationY: globe?.getAttribute("data-focus-rotation-y-current"),
         focusProgress: globe?.getAttribute("data-focus-progress"),
+        activeScreenX: globe?.getAttribute("data-active-screen-x"),
+        activeScreenY: globe?.getAttribute("data-active-screen-y"),
+        activeScreenDepth: globe?.getAttribute("data-active-screen-depth"),
         marker: globe?.getAttribute("data-active-marker"),
         transitionFrom: globe?.getAttribute("data-transition-from"),
         transitionTo: globe?.getAttribute("data-transition-to"),
@@ -55,9 +58,17 @@ try {
       const globe = document.querySelector(".three-globe");
       return globe?.getAttribute("data-transition-from") === "" && globe?.getAttribute("data-transition-to") === expected && globe?.getAttribute("data-is-transitioning") === "false";
     }, { expected: target.id }, { timeout: 3_000 });
-    const settled = await page.evaluate(() => ({ from: document.querySelector(".three-globe")?.getAttribute("data-transition-from"), to: document.querySelector(".three-globe")?.getAttribute("data-transition-to"), isTransitioning: document.querySelector(".three-globe")?.getAttribute("data-is-transitioning") }));
-    if (settled.from || settled.to !== target.id || settled.isTransitioning !== "false") throw new Error(`Transição não estabilizou para ${target.label}: ${JSON.stringify(settled)}`);
-    results.push({ from: previous, to: target.id, longitudeChanged: current.longitude !== beforeLongitude, focusMotion: { start: focusRotationAtStart, end: focusRotationAtEnd, changed: focusMotionChanged }, animated: current.isTransitioning === "true", marker: current.marker, telemetryUpdated: true, groundDetailsPresent: Boolean(current.groundDetails), settled });
+    const settled = await page.evaluate(() => ({
+      from: document.querySelector(".three-globe")?.getAttribute("data-transition-from"),
+      to: document.querySelector(".three-globe")?.getAttribute("data-transition-to"),
+      isTransitioning: document.querySelector(".three-globe")?.getAttribute("data-is-transitioning"),
+      activeScreenX: document.querySelector(".three-globe")?.getAttribute("data-active-screen-x"),
+      activeScreenY: document.querySelector(".three-globe")?.getAttribute("data-active-screen-y"),
+      activeScreenDepth: document.querySelector(".three-globe")?.getAttribute("data-active-screen-depth"),
+    }));
+    const activeCentered = Math.abs(Number(settled.activeScreenX)) < 0.08 && Math.abs(Number(settled.activeScreenY)) < 0.08 && Number(settled.activeScreenDepth) < 1;
+    if (settled.from || settled.to !== target.id || settled.isTransitioning !== "false" || !activeCentered) throw new Error(`Transição não estabilizou centralizada para ${target.label}: ${JSON.stringify({ settled, activeCentered })}`);
+    results.push({ from: previous, to: target.id, longitudeChanged: current.longitude !== beforeLongitude, focusMotion: { start: focusRotationAtStart, end: focusRotationAtEnd, changed: focusMotionChanged }, centered: activeCentered, animated: current.isTransitioning === "true", marker: current.marker, telemetryUpdated: true, groundDetailsPresent: Boolean(current.groundDetails), settled });
     previous = target.id;
   }
 

@@ -221,8 +221,19 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }
     }
   });
 
+  const selectMarker = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    onSelect(marker.id);
+  };
+
   return (
-    <group position={position} renderOrder={active ? 6 : 5} onClick={(e) => { e.stopPropagation(); onSelect(marker.id); }}>
+    <group position={position} renderOrder={active ? 6 : 5}>
+      {/* Área de raycast maior que o ponto visual: melhora o clique/touch sem
+          aumentar o marker exibido nem alterar a leitura do globo. */}
+      <mesh onClick={selectMarker} renderOrder={active ? 8 : 7}>
+        <sphereGeometry args={[active ? 0.085 : 0.07, 16, 16]} />
+        <meshBasicMaterial transparent opacity={0} depthTest={false} depthWrite={false} side={DoubleSide} />
+      </mesh>
       {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} depthTest={false} side={DoubleSide} /></mesh></group>}
       {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.07, 0.085, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} depthTest={false} side={DoubleSide} /></mesh></group>}
       {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.068, 0.082, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} depthTest={false} side={DoubleSide} /></mesh></group>}

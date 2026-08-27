@@ -189,17 +189,35 @@ function MarkerGlow() {
 }
 
 // ─── Satellite Marker ──────────────────────────────────────────────────
-function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }: { marker: Marker; active: boolean; transition: MarkerTransition; onSelect: (id: string) => void; reducedMotion: boolean }) {
+function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion, onVisibilityChange }: { marker: Marker; active: boolean; transition: MarkerTransition; onSelect: (id: string) => void; reducedMotion: boolean; onVisibilityChange?: (markerId: string, visible: boolean) => void }) {
   const position = useMemo(() => toCartesian(marker.latitude, marker.longitude, 1.065), [marker.latitude, marker.longitude]);
+  const markerRoot = useRef<Group>(null);
+  const markerVisual = useRef<Group>(null);
   const outgoingRing = useRef<Group>(null);
   const incomingRing = useRef<Group>(null);
   const glowRef = useRef<Group>(null);
   const pulseRef = useRef<Group>(null);
   const pulseWaveRef = useRef<Group>(null);
+  const wasFrontVisible = useRef<boolean | null>(null);
+  const worldMarkerPosition = useRef(new Vector3());
+  const worldCameraPosition = useRef(new Vector3());
   const isLeaving = transition.fromId === marker.id;
   const isEntering = transition.fromId !== null && transition.toId === marker.id;
 
-  useFrame(({ invalidate }) => {
+  useFrame(({ camera, invalidate }) => {
+    if (markerRoot.current && markerVisual.current) {
+      markerRoot.current.getWorldPosition(worldMarkerPosition.current);
+      camera.getWorldPosition(worldCameraPosition.current);
+      // O produto escalar entre o vetor radial do marker e a posição da câmera
+      // identifica o hemisfério frontal. O pequeno limiar evita pontos instáveis
+      // exatamente na linha do horizonte da esfera.
+      const frontVisible = worldMarkerPosition.current.dot(worldCameraPosition.current) > 0.03;
+      markerVisual.current.visible = frontVisible;
+      if (wasFrontVisible.current !== frontVisible) {
+        wasFrontVisible.current = frontVisible;
+        onVisibilityChange?.(marker.id, frontVisible);
+      }
+    }
     if (reducedMotion) return;
     if (isLeaving && outgoingRing.current) {
       const p = Math.min(1, (performance.now() - transition.startedAt) / FOCUS_DURATION_MS);
@@ -237,20 +255,24 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion }
   };
 
   return (
-    <group position={position} renderOrder={active ? 6 : 5}>
-      {/* Área de raycast maior que o ponto visual: melhora o clique/touch sem
-          aumentar o marker exibido nem alterar a leitura do globo. */}
-      <mesh onClick={selectMarker} renderOrder={active ? 8 : 7}>
-        <sphereGeometry args={[active ? 0.085 : 0.07, 16, 16]} />
-        <meshBasicMaterial transparent opacity={0} depthTest={false} depthWrite={false} side={DoubleSide} />
-      </mesh>
-      {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} depthTest={false} side={DoubleSide} /></mesh></group>}
-      {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.07, 0.085, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} depthTest={false} side={DoubleSide} /></mesh></group>}
-      {active && <group ref={pulseWaveRef}><mesh><ringGeometry args={[0.058, 0.066, 32]} /><meshBasicMaterial color="#ffd0ba" transparent opacity={0.42} depthTest={false} side={DoubleSide} /></mesh></group>}
-      {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.068, 0.082, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} depthTest={false} side={DoubleSide} /></mesh></group>}
-      {active && <group ref={glowRef}><MarkerGlow /></group>}
-      <mesh><sphereGeometry args={[active ? 0.042 : 0.03, 16, 16]} /><meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} depthTest={false} /></mesh>
-      {active && <mesh><sphereGeometry args={[0.018, 10, 10]} /><meshBasicMaterial color="#fff5ee" depthTest={false} /></mesh>}
+    <group ref={markerRoot} position={position} renderOrder={active ? 6 : 5}>
+      <group ref={markerVisual}>
+        {/* Área de raycast maior que o ponto visual: melhora o clique/touch sem
+            aumentar o marker exibido nem alterar a leitura do globo. Como todo
+            o conjunto fica invisível atrás da esfera, markers traseiros também
+            deixam de receber cliques. */}
+        <mesh onClick={selectMarker} renderOrder={active ? 8 : 7}>
+          <sphereGeometry args={[active ? 0.085 : 0.07, 16, 16]} />
+          <meshBasicMaterial transparent opacity={0} depthTest={true} depthWrite={false} side={DoubleSide} />
+        </mesh>
+        {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.07, 0.085, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {active && <group ref={pulseWaveRef}><mesh><ringGeometry args={[0.058, 0.066, 32]} /><meshBasicMaterial color="#ffd0ba" transparent opacity={0.42} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.068, 0.082, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {active && <group ref={glowRef}><MarkerGlow /></group>}
+        <mesh><sphereGeometry args={[active ? 0.042 : 0.03, 16, 16]} /><meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} depthTest={true} depthWrite={false} /></mesh>
+        {active && <mesh><sphereGeometry args={[0.018, 10, 10]} /><meshBasicMaterial color="#fff5ee" depthTest={true} depthWrite={false} /></mesh>}
+      </group>
     </group>
   );
 }
@@ -453,7 +475,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
 //   innerGroup ← geographic focus transition (latitude/longitude)
 // During a selection, the outer group returns to neutral so the selected marker
 // cannot inherit a previous drag/auto-rotation offset.
-function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion, onRotationFrame }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition; onRotationFrame?: (rotationY: number, focusRotationY: number, progress: number, activeScreenX: number, activeScreenY: number, activeDepth: number) => void }) {
+function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocation, reducedMotion, onRotationFrame, onMarkerVisibilityChange }: Omit<EarthGlobeProps, "className"> & { reducedMotion: boolean; markerTransition: MarkerTransition; onRotationFrame?: (rotationY: number, focusRotationY: number, progress: number, activeScreenX: number, activeScreenY: number, activeDepth: number) => void; onMarkerVisibilityChange?: (markerId: string, visible: boolean) => void }) {
   const outerGroup = useRef<Group>(null);
   const innerGroup = useRef<Group>(null);
   const selected = markers.find(m => m.id === selectedId);
@@ -578,7 +600,7 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
         <CloudLayer />
         <Atmosphere />
         {markers.map(marker => (
-          <SatelliteMarker key={marker.id} marker={marker} active={marker.id === selectedId} transition={markerTransition} onSelect={onSelect} reducedMotion={reducedMotion} />
+            <SatelliteMarker key={marker.id} marker={marker} active={marker.id === selectedId} transition={markerTransition} onSelect={onSelect} reducedMotion={reducedMotion} onVisibilityChange={onMarkerVisibilityChange} />
         ))}
         {userLocation && <UserLocationMarker location={userLocation} reducedMotion={reducedMotion} />}
       </group>
@@ -611,6 +633,16 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
 
   const markerGeometry = JSON.stringify(markers.map(m => ({ id: m.id, latitude: m.latitude, longitude: m.longitude })));
   const isTransitioning = Boolean(markerTransition.fromId) && !reducedMotion;
+  const handleMarkerVisibility = useCallback((markerId: string, visible: boolean) => {
+    const element = globeElementRef.current;
+    if (!element) return;
+    const visibleMarkers = new Set((element.getAttribute("data-visible-marker-ids") || "").split(",").filter(Boolean));
+    if (visible) visibleMarkers.add(markerId);
+    else visibleMarkers.delete(markerId);
+    element.setAttribute("data-visible-marker-ids", Array.from(visibleMarkers).sort().join(","));
+    element.setAttribute("data-visible-marker-count", String(visibleMarkers.size));
+  }, []);
+
   const handleRotationFrame = useCallback((rotationY: number, focusRotationY: number, progress: number, activeScreenX: number, activeScreenY: number, activeDepth: number) => {
     const element = globeElementRef.current;
     if (!element) return;
@@ -636,6 +668,9 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
       data-transition-to={markerTransition.toId}
       data-is-transitioning={isTransitioning}
       data-marker-count={markers.length}
+      data-visible-marker-count="0"
+      data-visible-marker-ids=""
+      data-front-hemisphere-only="true"
       data-marker-geometry={markerGeometry}
       data-focus-latitude={selectedMarker?.latitude ?? 0}
       data-focus-longitude={selectedMarker?.longitude ?? 0}
@@ -665,6 +700,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
             reducedMotion={reducedMotion}
             userLocation={userLocation}
             onRotationFrame={handleRotationFrame}
+            onMarkerVisibilityChange={handleMarkerVisibility}
           />
         </Suspense>
       </Canvas>

@@ -98,6 +98,21 @@ function seoMarkup(route, metadata) {
     <!-- route-seo:end -->`;
 }
 
+const criticalShellStyles = `<style id="orbita-critical-shell">
+  :root { color-scheme: dark; background: #061321; }
+  html, body { min-height: 100%; margin: 0; background: #061321; }
+  body { color: #edf3ef; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  #root { min-height: 100vh; background: radial-gradient(circle at 50% -12%, rgba(22, 74, 101, .24), transparent 46%), #061321; }
+  .seo-static-content { box-sizing: border-box; width: min(680px, calc(100% - 40px)); margin: 0 auto; padding: 96px 0 72px; color: #edf3ef; }
+  .seo-static-content h1 { margin: 0 0 18px; color: #f6f1e7; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 5vw, 4.2rem); font-weight: 400; line-height: .98; letter-spacing: -.045em; }
+  .seo-static-content h2 { margin: 34px 0 10px; color: #f6f1e7; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
+  .seo-static-content p { max-width: 620px; margin: 10px 0; color: #aebfc6; font-size: .95rem; line-height: 1.65; }
+  .seo-static-content nav { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-top: 30px; }
+  .seo-static-content a { color: #63e6be; font-size: .78rem; letter-spacing: .04em; text-decoration: none; }
+  .seo-static-content a:hover { color: #ffb38d; }
+  @media (max-width: 560px) { .seo-static-content { width: calc(100% - 32px); padding-top: 58px; } .seo-static-content nav { flex-direction: column; gap: 10px; } }
+</style>`;
+
 function render(template, route) {
   const metadata = routes[route];
   if (!metadata) throw new Error(`Rota sem metadados: ${route}`);
@@ -105,7 +120,9 @@ function render(template, route) {
   if (!content) throw new Error(`Rota sem conteúdo estático: ${route}`);
   return template
     .replace(/<!-- route-seo:start -->[\s\S]*?<!-- route-seo:end -->/, seoMarkup(route, metadata))
-    .replace(/<!-- route-content:start -->[\s\S]*?<!-- route-content:end -->/, `<!-- route-content:start -->\n      ${content}\n      <!-- route-content:end -->`);
+    .replace(/<!-- route-content:start -->[\s\S]*?<!-- route-content:end -->/, `<!-- route-content:start -->\n      ${content}\n      <!-- route-content:end -->`)
+    .replace(/<link rel="stylesheet" crossorigin href="([^"]+)">/, '<link rel="preload" as="style" crossorigin href="$1"><link rel="stylesheet" crossorigin href="$1">')
+    .replace('</head>', `${criticalShellStyles}\n  </head>`);
 }
 
 const template = await readFile(path.join(publicDir, "index.html"), "utf8");

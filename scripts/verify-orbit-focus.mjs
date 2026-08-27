@@ -47,6 +47,9 @@ try {
   const settledTransition = await page.evaluate(() => ({
     from: document.querySelector(".three-globe")?.getAttribute("data-transition-from"),
     to: document.querySelector(".three-globe")?.getAttribute("data-transition-to"),
+    activeScreenX: document.querySelector(".three-globe")?.getAttribute("data-active-screen-x"),
+    activeScreenY: document.querySelector(".three-globe")?.getAttribute("data-active-screen-y"),
+    activeScreenDepth: document.querySelector(".three-globe")?.getAttribute("data-active-screen-depth"),
   }));
 
   const hasTelemetry = Boolean(after.telemetry?.includes("altitude") && after.telemetry?.includes("velocidade") && !after.telemetry?.includes("—"));
@@ -54,7 +57,7 @@ try {
   const expectedReducedMotion = process.env.E2E_REDUCED_MOTION === "1" ? "true" : "false";
   const focusMotionChanged = Boolean(focusMotionStart && focusMotionEnd && focusMotionStart !== focusMotionEnd);
   const progressIsActive = Number(focusProgressAtMotion) > 0 && Number(focusProgressAtMotion) < 1;
-  const activeCentered = Math.abs(Number(after.activeScreenX)) < 0.08 && Math.abs(Number(after.activeScreenY)) < 0.08 && Number(after.activeScreenDepth) < 1;
+  const activeCentered = Math.abs(Number(settledTransition.activeScreenX)) < 0.08 && Math.abs(Number(settledTransition.activeScreenY)) < 0.08 && Number(settledTransition.activeScreenDepth) < 1;
   if (after.activeMarker !== "hubble" || !after.title?.includes("Hubble") || !after.imageAlt?.includes("Hubble") || beforeRotation === after.rotation || !focusMotionChanged || !progressIsActive || !activeCentered || after.rotationDuration !== "500" || after.reducedMotion !== expectedReducedMotion || settledTransition.from || settledTransition.to !== "hubble" || !hasTelemetry || !hasGroundLocation) {
     throw new Error(`A interação de foco não atualizou todos os elementos: ${JSON.stringify({ beforeRotation, focusMotionStart, focusMotionEnd, focusProgressAtMotion, after, settledTransition })}`);
   }

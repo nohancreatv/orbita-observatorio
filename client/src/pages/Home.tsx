@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { AppRouter } from "../../../server/routers";
 import { EarthGlobe } from "@/components/EarthGlobe";
+import { OrbitComparison2D } from "@/components/OrbitComparison2D";
 import { AdSlot } from "@/components/AdSlot";
 import { TextReveal } from "@/components/TextReveal";
 import { RevealText } from "@/components/RevealText";
@@ -91,6 +92,8 @@ function getVisibilityCopy(visibility?: string) {
 export default function Home() {
   const { clearPreferences } = useConsent();
   const [selectedSatellite, setSelectedSatellite] = useState<SatelliteId>("iss");
+  const [viewMode, setViewMode] = useState<"3d" | "2d">("3d");
+  const [comparisonIds, setComparisonIds] = useState<SatelliteId[]>(["iss", "hubble"]);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Conectando à constelação orbital…");
@@ -98,6 +101,8 @@ export default function Home() {
 
   const catalogQuery = trpc.orbit.catalog.useQuery(undefined, { staleTime: 60 * 60_000 });
   const allSnapshotsQuery = trpc.orbit.allSnapshots.useQuery(undefined, { refetchInterval: 15_000, retry: 1 });
+  const trajectoryInput = useMemo(() => ({ satelliteIds: comparisonIds }), [comparisonIds]);
+  const trajectoriesQuery = trpc.orbit.trajectories.useQuery(trajectoryInput, { enabled: viewMode === "2d", staleTime: 60_000, refetchInterval: 5 * 60_000, retry: 1 });
   const storyQuery = trpc.space.story.useQuery(undefined, { staleTime: 6 * 60 * 60_000, retry: 1 });
   const launchesQuery = trpc.space.launches.useQuery(undefined, { staleTime: 20 * 60_000, retry: 1 });
   const userPlace = trpc.orbit.userPlace.useMutation();
@@ -131,6 +136,9 @@ export default function Home() {
   useEffect(() => {
     if (satellites.length && !satellites.some(item => item.id === selectedSatellite)) {
       setSelectedSatellite(satellites[0].id as SatelliteId);
+    }
+    if (satellites.length) {
+      setComparisonIds(current => current.filter(id => satellites.some(item => item.id === id)).slice(0, 4));
     }
   }, [satellites, selectedSatellite]);
 
@@ -204,6 +212,24 @@ export default function Home() {
     return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
   };
   const globeMarkers = useMemo(() => allSnapshots.map(item => ({ id: item.satellite.id, shortName: item.satellite.shortName, name: item.satellite.name, latitude: item.latitude, longitude: item.longitude })), [allSnapshots]);
+  const toggleComparisonSatellite = (satelliteId: SatelliteId) => {
+    setComparisonIds(current => {
+      if (current.includes(satelliteId)) {
+        if (current.length === 1) return current;
+        return current.filter(id => id !== satelliteId);
+      }
+      return current.length >= 4 ? [...current.slice(1), satelliteId] : [...current, satelliteId];
+    });
+  };
+
+  const selectSatellite = (satelliteId: SatelliteId) => {
+    setSelectedSatellite(satelliteId);
+    setComparisonIds(current => current.includes(satelliteId) ? current : current.length >= 4 ? [...current.slice(1), satelliteId] : [...current, satelliteId]);
+  };
+
+  const setActiveSatellite = (satelliteId: SatelliteId) => {
+    setSelectedSatellite(satelliteId);
+  };
 
   return (
     <main className="observatory-shell">
@@ -224,25 +250,40 @@ export default function Home() {
           <div className="satellite-selector" aria-label="Selecionar objeto orbital">
             <span className="selector-label">na constelação · {satellites.length || "—"} disponíveis · {allSnapshots.length || "—"} com sinal</span>
             <div className="selector-options stagger-list">
-              {availableSatellites.length ? availableSatellites.map(satellite => <button key={satellite.id} type="button" onClick={() => setSelectedSatellite(satellite.id as SatelliteId)} className={selectedSatellite === satellite.id ? "satellite-option is-active" : "satellite-option"} aria-pressed={selectedSatellite === satellite.id}>{satellite.shortName}</button>) : <span className="catalog-loading">carregando satélites…</span>}
+              {availableSatellites.length ? availableSatellites.map(satellite => <button key={satellite.id} type="button" onClick={() => selectSatellite(satellite.id as SatelliteId)} className={selectedSatellite === satellite.id ? "satellite-option is-active" : "satellite-option"} aria-pressed={selectedSatellite === satellite.id}>{satellite.shortName}</button>) : <span className="catalog-loading">carregando satélites…</span>}
             </div>
+          </div>
+          <div className="view-mode-switcher" role="tablist" aria-label="Modo de visualização orbital">
+            <button type="button" role="tab" aria-selected={viewMode === "3d"} className={viewMode === "3d" ? "is-active" : ""} onClick={() => setViewMode("3d")}><Orbit size={14} aria-hidden="true" /> globo 3D</button>
+            <button type="button" role="tab" aria-selected={viewMode === "2d"} className={viewMode === "2d" ? "is-active" : ""} onClick={() => setViewMode("2d")}><Ruler size={14} aria-hidden="true" /> órbita 2D</button>
           </div>
           <div className="action-row"><button type="button" onClick={requestLocation} className="locate-button" disabled={isLocating}><LocateFixed size={18} aria-hidden="true" />{isLocating ? "localizando…" : userLocation ? "atualizar horizonte" : "usar minha localização"}<ArrowUpRight size={17} aria-hidden="true" /></button><p className="privacy-note">A posição é usada apenas para esta consulta e não é salva.</p></div>
           <div className="live-readout" role="status" aria-live="polite"><Radio size={15} aria-hidden="true" /><span>{statusMessage}</span></div>
         </TextReveal>
 
-        <div className="orbital-stage multi-orbit-stage" aria-label={`Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais`}>
-          <img src="/assets/iss-hero-earth_dc590d13.jpg" alt="Terra vista do espaço" className="hero-earth-art" />
-          <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
-          <EarthGlobe
-            markers={globeMarkers}
-            selectedId={selectedSatellite}
-            onSelect={id => setSelectedSatellite(id as SatelliteId)}
-            className="three-globe-interactive"
-            userLocation={userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : null}
-          />
-          <div className="globe-badge globe-badge-wide"><div className="badge-icon"><Crosshair size={17} aria-hidden="true" /></div><div><span>{selectedShortName} agora</span><strong>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "sincronizando coordenadas"}</strong><small><MapPin size={11} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização terrestre em leitura"}</small></div></div>
-          <div className="orbit-caption orbit-caption-bottom"><span /> foco: {selectedShortName}</div>
+          <div className={`orbital-stage multi-orbit-stage orbital-stage--${viewMode}`} aria-label={viewMode === "3d" ? `Globo terrestre com a posição atual de ${allSnapshots.length} objetos orbitais` : "Comparação 2D das trajetórias orbitais selecionadas"}>
+          {viewMode === "3d" ? <>
+            <img src="/assets/iss-hero-earth_dc590d13.jpg" alt="Terra vista do espaço" className="hero-earth-art" />
+            <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
+            <EarthGlobe
+              markers={globeMarkers}
+              selectedId={selectedSatellite}
+              onSelect={id => selectSatellite(id as SatelliteId)}
+              className="three-globe-interactive"
+              userLocation={userLocation ? { latitude: userLocation.latitude, longitude: userLocation.longitude } : null}
+            />
+            <div className="globe-badge globe-badge-wide"><div className="badge-icon"><Crosshair size={17} aria-hidden="true" /></div><div><span>{selectedShortName} agora</span><strong>{snapshot ? `${formatCoordinate(snapshot.latitude, true)} · ${formatCoordinate(snapshot.longitude, false)}` : "sincronizando coordenadas"}</strong><small><MapPin size={11} aria-hidden="true" /> {snapshot?.groundLocation.label || "localização terrestre em leitura"}</small></div></div>
+            <div className="orbit-caption orbit-caption-bottom"><span /> foco: {selectedShortName}</div>
+          </> : <OrbitComparison2D
+            satellites={satellites}
+            selectedIds={comparisonIds}
+            activeId={selectedSatellite}
+            trajectories={trajectoriesQuery.data || []}
+            isLoading={trajectoriesQuery.isLoading || trajectoriesQuery.isFetching}
+            isError={trajectoriesQuery.isError}
+            onToggle={toggleComparisonSatellite}
+            onPrimarySelect={setActiveSatellite}
+          />}
         </div>
       </section>
 

@@ -187,6 +187,21 @@ export type OrbitSnapshot = {
   sourceUrl: string;
 };
 
+export type OrbitTrajectoryPoint = {
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  timestamp: number;
+};
+
+export type OrbitTrajectory = {
+  satellite: (typeof SATELLITE_CATALOG)[SatelliteId];
+  points: OrbitTrajectoryPoint[];
+  durationMinutes: number;
+  generatedAt: number;
+  sourceUrl: string;
+};
+
 type CacheEntry<T> = { value: T; expiresAt: number; staleUntil: number };
 const cache = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
@@ -329,32 +344,61 @@ async function getCelesTrakElements(satelliteId: Exclude<SatelliteId, "iss">): P
   });
 }
 
-async function propagateTleSnapshot(satelliteId: SatelliteId, { line1, line2 }: CelesTrakElements): Promise<Omit<OrbitSnapshot, "groundLocation">> {
-  const selected = SATELLITE_CATALOG[satelliteId];
-  const satrec = satellite.twoline2satrec(line1, line2);
-  const now = new Date();
-  const propagated = satellite.propagate(satrec, now);
+function trajectoryTleEndpoint(satelliteId: SatelliteId) {
+  return `https://celestrak.org/NORAD/elements/gp.php?CATNR=${SATELLITE_CATALOG[satelliteId].noradId}&FORMAT=TLE`;
+}
+
+async function getTrajectoryElements(satelliteId: SatelliteId): Promise<CelesTrakElements> {
+  return withCache(`trajectory-tle-elements:${satelliteId}`, 2 * 60 * 60_000, async () => {
+    try {
+      const response = await fetch(trajectoryTleEndpoint(satelliteId), {
+        headers: { Accept: "text/plain", "User-Agent": "Orbita-ISS-Observatory/1.0" },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) throw new Error(`Elementos orbitais indisponíveis: ${response.status}`);
+      const lines = (await response.text()).trim().split(/\r?\n/).filter(Boolean);
+      if (lines.length < 3) throw new Error("Elementos orbitais inválidos.");
+      return { line1: lines[1], line2: lines[2] };
+    } catch (error) {
+      console.warn(`[Orbit] trajetória de ${satelliteId} usando TLE de contingência.`, error instanceof Error ? error.message : error);
+      return getFallbackTleElements(satelliteId);
+    }
+  });
+}
+
+function propagateTlePoint(satrec: satellite.SatRec, date: Date): OrbitTrajectoryPoint & { velocity: number } {
+  const propagated = satellite.propagate(satrec, date);
   const pos = propagated.position;
   const vel = propagated.velocity;
   if (!pos || !vel || typeof pos === "boolean" || typeof vel === "boolean") {
     throw new Error("Não foi possível propagar a órbita selecionada.");
   }
 
-  const gmst = satellite.gstime(now);
+  const gmst = satellite.gstime(date);
   const geodetic = satellite.eciToGeodetic(pos, gmst);
-  const velocity = Math.sqrt(
-    vel.x ** 2 + vel.y ** 2 + vel.z ** 2,
-  ) * 3600;
-
   return {
-    satellite: selected,
     latitude: satellite.degreesLat(geodetic.latitude),
     longitude: normaliseLongitude(satellite.degreesLong(geodetic.longitude)),
     altitude: Math.max(0, geodetic.height),
-    velocity,
+    velocity: Math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2) * 3600,
+    timestamp: Math.floor(date.getTime() / 1000),
+  };
+}
+
+async function propagateTleSnapshot(satelliteId: SatelliteId, { line1, line2 }: CelesTrakElements): Promise<Omit<OrbitSnapshot, "groundLocation">> {
+  const selected = SATELLITE_CATALOG[satelliteId];
+  const now = new Date();
+  const point = propagateTlePoint(satellite.twoline2satrec(line1, line2), now);
+
+  return {
+    satellite: selected,
+    latitude: point.latitude,
+    longitude: point.longitude,
+    altitude: point.altitude,
+    velocity: point.velocity,
     visibility: "estimativa orbital",
     footprint: null,
-    timestamp: Math.floor(now.getTime() / 1000),
+    timestamp: point.timestamp,
     sourceUrl: selected.telemetry.endpoint,
   };
 }
@@ -409,6 +453,40 @@ export async function getOrbitSnapshot(satelliteId: SatelliteId): Promise<OrbitS
 export async function getOrbitSnapshots(): Promise<OrbitSnapshot[]> {
   const requested = Object.keys(SATELLITE_CATALOG) as SatelliteId[];
   const settled = await Promise.allSettled(requested.map(getOrbitSnapshot));
+  return settled.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
+}
+
+const TRAJECTORY_DURATION_MINUTES = 120;
+const TRAJECTORY_STEP_SECONDS = 60;
+
+export async function getOrbitTrajectory(satelliteId: SatelliteId): Promise<OrbitTrajectory> {
+  const elements = await getTrajectoryElements(satelliteId);
+  const satrec = satellite.twoline2satrec(elements.line1, elements.line2);
+  const generatedAt = Date.now();
+  const pointCount = Math.floor((TRAJECTORY_DURATION_MINUTES * 60) / TRAJECTORY_STEP_SECONDS) + 1;
+  const points = Array.from({ length: pointCount }, (_, index) => {
+    const date = new Date(generatedAt + index * TRAJECTORY_STEP_SECONDS * 1000);
+    const point = propagateTlePoint(satrec, date);
+    return {
+      latitude: point.latitude,
+      longitude: point.longitude,
+      altitude: point.altitude,
+      timestamp: point.timestamp,
+    };
+  });
+
+  return {
+    satellite: SATELLITE_CATALOG[satelliteId],
+    points,
+    durationMinutes: TRAJECTORY_DURATION_MINUTES,
+    generatedAt,
+    sourceUrl: trajectoryTleEndpoint(satelliteId),
+  };
+}
+
+export async function getOrbitTrajectories(satelliteIds: SatelliteId[]): Promise<OrbitTrajectory[]> {
+  const uniqueIds = Array.from(new Set(satelliteIds)).slice(0, 4);
+  const settled = await Promise.allSettled(uniqueIds.map(getOrbitTrajectory));
   return settled.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
 }
 

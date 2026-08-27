@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getOrbitSnapshot, getOrbitSnapshots, resetOrbitServiceCacheForTests, SATELLITE_CATALOG } from "./orbitService";
+import { getOrbitSnapshot, getOrbitSnapshots, getOrbitTrajectory, getOrbitTrajectories, resetOrbitServiceCacheForTests, SATELLITE_CATALOG } from "./orbitService";
+import type { SatelliteId } from "./orbitService";
 
 const originalFetch = global.fetch;
 
@@ -60,6 +61,32 @@ describe("catálogo de satélites", () => {
     expect(new Set(snapshots.map(snapshot => snapshot.satellite.id)).size).toBe(10);
     expect(snapshots.every(snapshot => Number.isFinite(snapshot.latitude) && Number.isFinite(snapshot.longitude))).toBe(true);
     expect(snapshots.every(snapshot => snapshot.visibility === "estimativa orbital")).toBe(true);
+  });
+
+  it("gera uma trilha temporal de duas horas a partir do TLE de contingência", async () => {
+    const fetchMock = vi.fn(async () => { throw new Error("CelesTrak indisponível"); });
+    global.fetch = fetchMock as typeof fetch;
+
+    const trajectory = await getOrbitTrajectory("iss");
+
+    expect(trajectory.satellite.id).toBe("iss");
+    expect(trajectory.durationMinutes).toBe(120);
+    expect(trajectory.points).toHaveLength(121);
+    expect(trajectory.points.every(point => Number.isFinite(point.latitude) && Number.isFinite(point.longitude) && Number.isFinite(point.altitude))).toBe(true);
+    expect(trajectory.points[0].timestamp).toBeLessThan(trajectory.points[120].timestamp);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("limita a comparação a quatro trajetórias e remove IDs repetidos", async () => {
+    const fetchMock = vi.fn(async () => { throw new Error("CelesTrak indisponível"); });
+    global.fetch = fetchMock as typeof fetch;
+    const ids: SatelliteId[] = ["iss", "hubble", "tiangong", "noaa19", "iss"];
+
+    const trajectories = await getOrbitTrajectories(ids);
+
+    expect(trajectories).toHaveLength(4);
+    expect(new Set(trajectories.map(trajectory => trajectory.satellite.id)).size).toBe(4);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("propaga o Landsat 9 a partir de um TLE e resolve seu ponto terrestre", async () => {

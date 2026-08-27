@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getEpicImages, getIssClosestPass, getNearEarthAsteroids, getObservingConditions, getOrbitSnapshot, getOrbitSnapshots, getPlaceImage, getSpaceStory, getSpaceWeather, getUpcomingLaunches, resolveGroundLocation, SATELLITE_CATALOG } from "./orbitService";
+import { getEpicImages, getIssClosestPass, getNearEarthAsteroids, getObservingConditions, getOrbitSnapshot, getOrbitSnapshots, getOrbitTrajectories, getPlaceImage, getSpaceStory, getSpaceWeather, getUpcomingLaunches, resolveGroundLocation, SATELLITE_CATALOG } from "./orbitService";
 import { isRateLimited } from "./security";
 
 const satelliteIdSchema = z.enum(["iss", "hubble", "tiangong", "noaa19", "noaa20", "noaa21", "sentinel1a", "landsat9", "terra", "aqua"]);
@@ -31,6 +31,9 @@ export const appRouter = router({
   orbit: router({
     catalog: orbitPublicProcedure.query(() => Object.values(SATELLITE_CATALOG)),
     allSnapshots: orbitPublicProcedure.query(() => getOrbitSnapshots()),
+    trajectories: orbitPublicProcedure
+      .input(z.object({ satelliteIds: z.array(satelliteIdSchema).min(1).max(4) }))
+      .query(({ input }) => getOrbitTrajectories(input.satelliteIds)),
     snapshot: orbitPublicProcedure.input(z.object({ satelliteId: satelliteIdSchema })).query(({ input }) => getOrbitSnapshot(input.satelliteId)),
     userPlace: orbitPublicProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).mutation(({ input }) => resolveGroundLocation(input.latitude, input.longitude)),
     issClosestPass: orbitPublicProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).mutation(({ input }) => getIssClosestPass(input.latitude, input.longitude)),

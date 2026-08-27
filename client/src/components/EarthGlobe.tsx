@@ -11,7 +11,8 @@ const CLOUD_MAP = "/assets/earth-clouds-atlas_8c506c86.png";
 const FOCUS_DURATION_MS = 500;
 const ROTATION_SENSITIVITY = 0.006;
 const INERTIA_DAMPING = 0.93;
-const AUTO_ROTATE_SPEED = 0.0016;
+// Incremento fixo por frame: a rotação autônoma é linear e não depende de easing.
+const AUTO_ROTATE_INCREMENT = 0.0016;
 const AUTO_ROTATE_DELAY_MS = 900;
 const MAX_TILT = Math.PI / 3;
 
@@ -404,7 +405,10 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
     }
 
     if (autoRotate.current) {
-      groupRef.current.rotation.y += AUTO_ROTATE_SPEED * frameScale;
+      // Rotação autônoma linear, executada dentro do loop principal do R3F.
+      // Não usar easing nem um tween pontual aqui: cada frame acrescenta o
+      // mesmo valor ao eixo Y do grupo que contém o globo.
+      groupRef.current.rotation.y += AUTO_ROTATE_INCREMENT;
     }
   });
 

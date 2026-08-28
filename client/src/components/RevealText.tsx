@@ -23,7 +23,7 @@ export function RevealText({ as = "h2", className = "", delay = 0, segments, sty
     words.map(({ word, emphasis }, index) => (
       <Fragment key={`${word}-${index}`}>
         {index > 0 ? " " : null}
-        <span className="word-reveal" aria-hidden="true" style={{ "--word-delay": `${index * 72}ms` } as CSSProperties}>
+        <span className="word-reveal" aria-hidden="true" style={{ "--word-delay": `${index * 42}ms` } as CSSProperties}>
           <span className="word-reveal__inner">{emphasis ? <em>{word}</em> : word}</span>
         </span>
       </Fragment>

@@ -634,23 +634,58 @@ function appearsToBePortuguese(value: string) {
   return /[ãõáéíóúàâêôç]/i.test(value) || /\b(arquivo|imagem|estrela|estrelas|galáxia|universo|telescópio|missão|nebulosa|planeta|observação|fotografia|para|uma|um|dos|das)\b/i.test(value);
 }
 
+const MAX_TRANSLATION_CHARS = 420;
+
+function splitTranslationText(text: string) {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const chunks: string[] = [];
+  let current = "";
+  for (const sentence of sentences) {
+    if (sentence.length <= MAX_TRANSLATION_CHARS && current.length + sentence.length + 1 <= MAX_TRANSLATION_CHARS) {
+      current = current ? `${current} ${sentence}` : sentence;
+      continue;
+    }
+    if (current) chunks.push(current);
+    if (sentence.length <= MAX_TRANSLATION_CHARS) {
+      current = sentence;
+      continue;
+    }
+    const words = sentence.split(/\s+/);
+    current = "";
+    for (const word of words) {
+      if (current.length + word.length + 1 > MAX_TRANSLATION_CHARS) {
+        if (current) chunks.push(current);
+        current = word;
+      } else {
+        current = current ? `${current} ${word}` : word;
+      }
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [text];
+}
+
 async function translateStoryText(value: string) {
   const text = cleanStoryText(value, "");
   if (!text || appearsToBePortuguese(text)) return text;
 
   const cacheKey = `translation:pt:${text}`;
   return withCache(cacheKey, 24 * 60 * 60_000, async () => {
-    try {
-      const url = new URL("https://api.mymemory.translated.net/get");
-      url.searchParams.set("q", text);
-      url.searchParams.set("langpair", "en|pt");
-      const data = await fetchJson<TranslationProviderData>(url.toString(), 5000);
-      if (data.responseStatus !== undefined && data.responseStatus !== 200) throw new Error(`Tradutor indisponível: ${data.responseStatus}`);
-      return cleanStoryText(data.responseData?.translatedText, text);
-    } catch {
-      // A curiosidade continua disponível no idioma original se o tradutor público falhar.
-      return text;
-    }
+    const chunks = splitTranslationText(text);
+    const translatedChunks = await Promise.all(chunks.map(chunk => withCache(`translation:pt:chunk:${chunk}`, 24 * 60 * 60_000, async () => {
+      try {
+        const url = new URL("https://api.mymemory.translated.net/get");
+        url.searchParams.set("q", chunk);
+        url.searchParams.set("langpair", "en|pt");
+        const data = await fetchJson<TranslationProviderData>(url.toString(), 5000);
+        if (data.responseStatus !== undefined && data.responseStatus !== 200) throw new Error(`Tradutor indisponível: ${data.responseStatus}`);
+        return cleanStoryText(data.responseData?.translatedText, chunk);
+      } catch {
+        // A curiosidade continua disponível no idioma original se o tradutor público falhar.
+        return chunk;
+      }
+    })));
+    return translatedChunks.join(" ");
   });
 }
 

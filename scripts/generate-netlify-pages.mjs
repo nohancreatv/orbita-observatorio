@@ -55,7 +55,7 @@ const routeContent = {
   "/fontes": `<main class="seo-static-content" aria-label="Fontes e limites">
     <h1>Fontes e limites</h1>
     <p>A Órbita agrega sinais de fontes públicas e apresenta uma leitura editorial.</p>
-    <h2>Fontes principais</h2><nav aria-label="Fontes públicas"><a href="https://wheretheiss.at/w/developer">Where the ISS at?</a><a href="https://celestrak.org/NORAD/documentation/gp-data-formats.php">CelesTrak</a><a href="https://api.nasa.gov/">NASA Open APIs</a><a href="https://open-meteo.com/en/docs">Open-Meteo</a></nav>
+    <h2>Fontes principais</h2><nav aria-label="Fontes públicas"><a href="https://wheretheiss.at/w/developer">Where the ISS at?</a><a href="https://celestrak.org/NORAD/documentation/gp-data-formats.php">CelesTrak</a><a href="https://api.nasa.gov/">NASA Open APIs</a><a href="https://mymemory.translated.net/doc/spec.php">MyMemory Translation API</a><a href="https://open-meteo.com/en/docs">Open-Meteo</a></nav>
   </main>`,
   "/404": `<main class="seo-static-content" aria-label="Página não encontrada">
     <h1>Página não encontrada — Órbita</h1>

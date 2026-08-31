@@ -13,6 +13,7 @@ const sources = [
   ["NASA DONKI", "Alertas de clima espacial: erupções solares, ejeções de massa coronal e tempestades geomagnéticas.", "https://api.nasa.gov/"],
   ["NASA NeoWs", "Asteroides e objetos próximos da Terra com dados de diâmetro, velocidade e distância.", "https://neo.jpl.nasa.gov/"],
   ["NASA Open APIs", "Curiosidade astronômica diária e crédito de conteúdo.", "https://images.nasa.gov/"],
+  ["MyMemory Translation API", "Tradução automática opcional do título e da explicação da curiosidade para português.", "https://mymemory.translated.net/doc/spec.php"],
   ["Open-Meteo", "Condições meteorológicas locais: cobertura de nuvens e visibilidade.", "https://open-meteo.com/en/docs"],
   ["BigDataCloud", "Geocodificação reversa do ponto suborbital e do horizonte local.", "https://www.bigdatacloud.com/"],
   ["The Space Devs", "Agenda de próximos lançamentos espaciais.", "https://ll.thespacedevs.com/"],

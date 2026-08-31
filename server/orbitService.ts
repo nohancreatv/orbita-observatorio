@@ -149,6 +149,11 @@ type NasaImageLibraryProviderData = {
   collection?: { items?: NasaImageLibraryItem[] };
 };
 
+type TranslationProviderData = {
+  responseStatus?: number;
+  responseData?: { translatedText?: string };
+};
+
 type WeatherProviderData = {
   current?: { time?: string; cloud_cover?: number; visibility?: number; weather_code?: number };
   timezone_abbreviation?: string;
@@ -210,6 +215,8 @@ const inFlight = new Map<string, Promise<unknown>>();
 export function resetOrbitServiceCacheForTests() {
   cache.clear();
   inFlight.clear();
+  latestSpaceStory = null;
+  nasaRetryAfter = 0;
 }
 
 async function withCache<T>(key: string, ttlMs: number, producer: () => Promise<T>, staleMs = Math.max(ttlMs * 4, 60_000)): Promise<T> {
@@ -623,8 +630,41 @@ function cleanStoryText(value: string | undefined, fallback: string) {
   return value?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 560) || fallback;
 }
 
+function appearsToBePortuguese(value: string) {
+  return /[ãõáéíóúàâêôç]/i.test(value) || /\b(arquivo|imagem|estrela|estrelas|galáxia|universo|telescópio|missão|nebulosa|planeta|observação|fotografia|para|uma|um|dos|das)\b/i.test(value);
+}
+
+async function translateStoryText(value: string) {
+  const text = cleanStoryText(value, "");
+  if (!text || appearsToBePortuguese(text)) return text;
+
+  const cacheKey = `translation:pt:${text}`;
+  return withCache(cacheKey, 24 * 60 * 60_000, async () => {
+    try {
+      const url = new URL("https://api.mymemory.translated.net/get");
+      url.searchParams.set("q", text);
+      url.searchParams.set("langpair", "en|pt");
+      const data = await fetchJson<TranslationProviderData>(url.toString(), 5000);
+      if (data.responseStatus !== undefined && data.responseStatus !== 200) throw new Error(`Tradutor indisponível: ${data.responseStatus}`);
+      return cleanStoryText(data.responseData?.translatedText, text);
+    } catch {
+      // A curiosidade continua disponível no idioma original se o tradutor público falhar.
+      return text;
+    }
+  });
+}
+
+async function localizeSpaceStory(story: SpaceStory): Promise<SpaceStory> {
+  const [title, explanation] = await Promise.all([
+    translateStoryText(story.title),
+    translateStoryText(story.explanation),
+  ]);
+  const credit = story.credit === "NASA Image and Video Library" ? "Biblioteca de imagens e vídeos da NASA" : story.credit;
+  return { ...story, title, explanation, credit };
+}
+
 async function getNasaImageLibraryStory(dateKey: string): Promise<SpaceStory> {
-  return withCache(`nasa:images:${dateKey}`, 24 * 60 * 60_000, async () => {
+  const story = await withCache(`nasa:images:${dateKey}`, 24 * 60 * 60_000, async () => {
     const url = new URL("https://images-api.nasa.gov/search");
     url.searchParams.set("q", "space astronomy cosmos");
     url.searchParams.set("media_type", "image");
@@ -654,6 +694,7 @@ async function getNasaImageLibraryStory(dateKey: string): Promise<SpaceStory> {
       sourceUrl: `https://images.nasa.gov/details/${encodeURIComponent(selected.id!)}`,
     };
   });
+  return localizeSpaceStory(story);
 }
 
 export async function getSpaceStory(): Promise<SpaceStory> {
@@ -685,8 +726,9 @@ export async function getSpaceStory(): Promise<SpaceStory> {
         sourceUrl: "https://api.nasa.gov/",
       };
     });
-    latestSpaceStory = story;
-    return story;
+    const localizedStory = await localizeSpaceStory(story);
+    latestSpaceStory = localizedStory;
+    return localizedStory;
   } catch (error) {
     if (isRateLimitError(error)) nasaRetryAfter = Date.now() + 15 * 60_000;
     console.warn(`[NASA APOD] Fonte temporariamente indisponível${isRateLimitError(error) ? " (429)" : ""}.`);

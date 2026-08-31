@@ -27,7 +27,7 @@ describe("credencial opcional da NASA Open APIs", () => {
       title: "Uma janela para o cosmos",
       sourceUrl: "https://images.nasa.gov/details/story-123",
       imageUrl: "https://images-assets.nasa.gov/image/story-123/story-123~orig.jpg",
-      credit: "NASA Image and Video Library",
+      credit: "Biblioteca de imagens e vídeos da NASA",
     });
   });
 });

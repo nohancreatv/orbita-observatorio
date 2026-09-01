@@ -10,6 +10,9 @@ const celesTrakTelemetry = (noradId: number) => ({
   format: "TLE" as const,
 });
 
+const romanHorizonsEndpoint = "https://ssd.jpl.nasa.gov/api/horizons.api";
+const romanHorizonsTarget = "-211";
+
 export const SATELLITE_CATALOG = {
   iss: {
     id: "iss",
@@ -101,6 +104,15 @@ export const SATELLITE_CATALOG = {
     source: "CelesTrak",
     telemetry: celesTrakTelemetry(27424),
   },
+  roman: {
+    id: "roman",
+    name: "Telescópio Espacial Nancy Grace Roman",
+    shortName: "Roman",
+    noradId: null,
+    category: "observatório espacial · L2",
+    source: "NASA/JPL Horizons",
+    telemetry: { provider: "NASA/JPL Horizons", endpoint: romanHorizonsEndpoint, format: "efemérides" as const },
+  },
 } as const;
 
 export type SatelliteId = keyof typeof SATELLITE_CATALOG;
@@ -147,6 +159,11 @@ type NasaImageLibraryItem = {
 
 type NasaImageLibraryProviderData = {
   collection?: { items?: NasaImageLibraryItem[] };
+};
+
+type HorizonsProviderData = {
+  result?: string;
+  error?: string;
 };
 
 type TranslationProviderData = {
@@ -206,6 +223,8 @@ export type OrbitTrajectory = {
   generatedAt: number;
   sourceUrl: string;
 };
+
+type HorizonsVector = { position: { x: number; y: number; z: number }; velocity: { x: number; y: number; z: number }; timestamp: number };
 
 type CacheEntry<T> = { value: T; expiresAt: number; staleUntil: number };
 const cache = new Map<string, CacheEntry<unknown>>();
@@ -285,12 +304,95 @@ async function getIssProviderSnapshot(): Promise<IssProviderData> {
   return withCache("iss:live", 9000, () => fetchJson<IssProviderData>("https://api.wheretheiss.at/v1/satellites/25544", 12_000));
 }
 
+function horizonsTime(date: Date) {
+  return date.toISOString().slice(0, 16).replace("T", " ");
+}
+
+function parseHorizonsVector(result: string, fallbackTimestamp: number): HorizonsVector {
+  const body = result.split("$$SOE")[1]?.split("$$EOE")[0]?.trim();
+  const row = body?.split(/\r?\n/).map(line => line.trim()).find(line => line && !line.startsWith("*") && !line.startsWith("JDTDB"));
+  if (!row) throw new Error("Efemérides do Roman sem vetor utilizável.");
+  const values = row.split(",").map(value => value.trim());
+  const numbers = values.slice(2, 8).map(Number);
+  if (numbers.length < 6 || numbers.some(value => !Number.isFinite(value))) throw new Error("Vetor do Roman inválido.");
+  return {
+    position: { x: numbers[0], y: numbers[1], z: numbers[2] },
+    velocity: { x: numbers[3], y: numbers[4], z: numbers[5] },
+    timestamp: fallbackTimestamp,
+  };
+}
+
+async function getRomanHorizonsVectors(start: Date, stop: Date, step: string): Promise<HorizonsVector[]> {
+  const url = new URL(romanHorizonsEndpoint);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("COMMAND", romanHorizonsTarget);
+  url.searchParams.set("CENTER", "500@399");
+  url.searchParams.set("EPHEM_TYPE", "VECTORS");
+  url.searchParams.set("START_TIME", horizonsTime(start));
+  url.searchParams.set("STOP_TIME", horizonsTime(stop));
+  url.searchParams.set("STEP_SIZE", step);
+  url.searchParams.set("VEC_TABLE", "2");
+  url.searchParams.set("REF_PLANE", "ECLIPTIC");
+  url.searchParams.set("OUT_UNITS", "KM-S");
+  url.searchParams.set("CSV_FORMAT", "YES");
+  const data = await fetchJson<HorizonsProviderData>(url.toString(), 15_000);
+  if (!data.result || data.error) throw new Error(data.error || "JPL Horizons não retornou efemérides do Roman.");
+  const rows = data.result.split("$$SOE")[1]?.split("$$EOE")[0]?.trim().split(/\r?\n/).map(line => line.trim()).filter(Boolean) || [];
+  return rows.map((row, index) => parseHorizonsVector(`${"$$SOE\n"}${row}${"\n$$EOE"}`, start.getTime() / 1000 + index * 600));
+}
+
+function horizonsVectorToOrbitPoint(vector: HorizonsVector): OrbitTrajectoryPoint & { velocity: number } {
+  const epsilon = 23.4392911 * Math.PI / 180;
+  const x = vector.position.x;
+  const y = vector.position.y * Math.cos(epsilon) - vector.position.z * Math.sin(epsilon);
+  const z = vector.position.y * Math.sin(epsilon) + vector.position.z * Math.cos(epsilon);
+  const vx = vector.velocity.x;
+  const vy = vector.velocity.y * Math.cos(epsilon) - vector.velocity.z * Math.sin(epsilon);
+  const vz = vector.velocity.y * Math.sin(epsilon) + vector.velocity.z * Math.cos(epsilon);
+  const date = new Date(vector.timestamp * 1000);
+  const theta = satellite.gstime(date);
+  const ecefX = Math.cos(theta) * x + Math.sin(theta) * y;
+  const ecefY = -Math.sin(theta) * x + Math.cos(theta) * y;
+  const radius = Math.sqrt(x ** 2 + y ** 2 + z ** 2);
+  const latitude = Math.atan2(z, Math.sqrt(x ** 2 + y ** 2)) * 180 / Math.PI;
+  const longitude = normaliseLongitude(Math.atan2(ecefY, ecefX) * 180 / Math.PI);
+  return {
+    latitude,
+    longitude,
+    altitude: Math.max(0, radius - 6378.137),
+    velocity: Math.sqrt(vx ** 2 + vy ** 2 + vz ** 2) * 3600,
+    timestamp: vector.timestamp,
+  };
+}
+
+async function getRomanSnapshot(): Promise<Omit<OrbitSnapshot, "groundLocation">> {
+  const now = new Date();
+  const vector = (await getRomanHorizonsVectors(now, new Date(now.getTime() + 60_000), "1 m"))[0];
+  if (!vector) throw new Error("JPL Horizons não retornou a posição atual do Roman.");
+  const point = horizonsVectorToOrbitPoint(vector);
+  return {
+    satellite: SATELLITE_CATALOG.roman,
+    latitude: point.latitude,
+    longitude: point.longitude,
+    altitude: point.altitude,
+    velocity: point.velocity,
+    visibility: "trajetória de transferência para L2",
+    footprint: null,
+    timestamp: point.timestamp,
+    sourceUrl: romanHorizonsEndpoint,
+  };
+}
+
+function romanGroundLocation(): GroundLocation {
+  return { city: null, country: null, countryCode: null, label: "direção geocêntrica do Roman · L2", isOceanOrRemote: true };
+}
+
 type CelesTrakElements = { line1: string; line2: string };
 
 // TLEs públicos recentes usados somente como último fallback de disponibilidade.
 // A fonte online continua sendo tentada primeiro; estes elementos impedem que
 // uma falha transitória apague satélites da constelação visual.
-const FALLBACK_TLE_ELEMENTS: Record<SatelliteId, CelesTrakElements> = {
+const FALLBACK_TLE_ELEMENTS: Record<Exclude<SatelliteId, "roman">, CelesTrakElements> = {
   iss: {
     line1: "1 25544U 98067A   26237.66055539  .00007716  00000+0  14485-3 0  9994",
     line2: "2 25544  51.6329 316.2335 0007673  83.1052 277.0809 15.49625410582525",
@@ -333,7 +435,7 @@ const FALLBACK_TLE_ELEMENTS: Record<SatelliteId, CelesTrakElements> = {
   },
 };
 
-function getFallbackTleElements(satelliteId: SatelliteId) {
+function getFallbackTleElements(satelliteId: Exclude<SatelliteId, "roman">) {
   return FALLBACK_TLE_ELEMENTS[satelliteId];
 }
 
@@ -355,7 +457,7 @@ function trajectoryTleEndpoint(satelliteId: SatelliteId) {
   return `https://celestrak.org/NORAD/elements/gp.php?CATNR=${SATELLITE_CATALOG[satelliteId].noradId}&FORMAT=TLE`;
 }
 
-async function getTrajectoryElements(satelliteId: SatelliteId): Promise<CelesTrakElements> {
+async function getTrajectoryElements(satelliteId: Exclude<SatelliteId, "roman">): Promise<CelesTrakElements> {
   return withCache(`trajectory-tle-elements:${satelliteId}`, 2 * 60 * 60_000, async () => {
     try {
       const response = await fetch(trajectoryTleEndpoint(satelliteId), {
@@ -414,13 +516,17 @@ async function getCelesTrakSnapshot(satelliteId: Exclude<SatelliteId, "iss">) {
   return propagateTleSnapshot(satelliteId, await getCelesTrakElements(satelliteId));
 }
 
-async function getFallbackSnapshot(satelliteId: SatelliteId): Promise<OrbitSnapshot> {
+async function getFallbackSnapshot(satelliteId: Exclude<SatelliteId, "roman">): Promise<OrbitSnapshot> {
   const snapshot = await propagateTleSnapshot(satelliteId, getFallbackTleElements(satelliteId));
   const groundLocation = await resolveGroundLocation(snapshot.latitude, snapshot.longitude);
   return { ...snapshot, groundLocation };
 }
 
 export async function getOrbitSnapshot(satelliteId: SatelliteId): Promise<OrbitSnapshot> {
+  if (satelliteId === "roman") {
+    const snapshot = await getRomanSnapshot();
+    return { ...snapshot, groundLocation: romanGroundLocation() };
+  }
   if (satelliteId === "iss") {
     try {
       const iss = await getIssProviderSnapshot();
@@ -467,6 +573,21 @@ const TRAJECTORY_DURATION_MINUTES = 120;
 const TRAJECTORY_STEP_SECONDS = 60;
 
 export async function getOrbitTrajectory(satelliteId: SatelliteId): Promise<OrbitTrajectory> {
+  if (satelliteId === "roman") {
+    const generatedAt = Date.now();
+    const start = new Date(generatedAt);
+    const vectors = await getRomanHorizonsVectors(start, new Date(generatedAt + TRAJECTORY_DURATION_MINUTES * 60_000), "10 m");
+    return {
+      satellite: SATELLITE_CATALOG.roman,
+      points: vectors.map(vector => {
+        const point = horizonsVectorToOrbitPoint(vector);
+        return { latitude: point.latitude, longitude: point.longitude, altitude: point.altitude, timestamp: point.timestamp };
+      }),
+      durationMinutes: TRAJECTORY_DURATION_MINUTES,
+      generatedAt,
+      sourceUrl: romanHorizonsEndpoint,
+    };
+  }
   const elements = await getTrajectoryElements(satelliteId);
   const satrec = satellite.twoline2satrec(elements.line1, elements.line2);
   const generatedAt = Date.now();

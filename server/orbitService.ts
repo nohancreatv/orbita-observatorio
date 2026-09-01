@@ -328,9 +328,9 @@ async function getRomanHorizonsVectors(start: Date, stop: Date, step: string): P
   url.searchParams.set("COMMAND", romanHorizonsTarget);
   url.searchParams.set("CENTER", "500@399");
   url.searchParams.set("EPHEM_TYPE", "VECTORS");
-  url.searchParams.set("START_TIME", horizonsTime(start));
-  url.searchParams.set("STOP_TIME", horizonsTime(stop));
-  url.searchParams.set("STEP_SIZE", step);
+  url.searchParams.set("START_TIME", `'${horizonsTime(start)}'`);
+  url.searchParams.set("STOP_TIME", `'${horizonsTime(stop)}'`);
+  url.searchParams.set("STEP_SIZE", `'${step}'`);
   url.searchParams.set("VEC_TABLE", "2");
   url.searchParams.set("REF_PLANE", "ECLIPTIC");
   url.searchParams.set("OUT_UNITS", "KM-S");

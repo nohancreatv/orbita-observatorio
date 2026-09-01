@@ -11,12 +11,15 @@ afterEach(() => {
 });
 
 describe("catálogo de satélites", () => {
-  it("mantém dez objetos rastreáveis com IDs NORAD únicos", () => {
+  it("mantém os dez satélites TLE e inclui o Roman como objeto JPL", () => {
     const satellites = Object.values(SATELLITE_CATALOG);
-    const noradIds = satellites.map(satellite => satellite.noradId);
+    const tleSatellites = satellites.filter(satellite => satellite.id !== "roman");
+    const noradIds = tleSatellites.map(satellite => satellite.noradId);
 
-    expect(satellites).toHaveLength(10);
+    expect(satellites).toHaveLength(11);
+    expect(tleSatellites).toHaveLength(10);
     expect(new Set(noradIds).size).toBe(noradIds.length);
+    expect(SATELLITE_CATALOG.roman).toMatchObject({ id: "roman", noradId: null, source: "NASA/JPL Horizons" });
     expect(satellites.map(satellite => satellite.id)).toEqual(expect.arrayContaining([
       "iss",
       "hubble",
@@ -31,10 +34,11 @@ describe("catálogo de satélites", () => {
     ]));
   });
 
-  it("configura Where the ISS at para a ISS e CelesTrak TLE para os demais", () => {
+  it("configura Where the ISS at para a ISS, CelesTrak para os dez TLE e JPL para o Roman", () => {
     expect(SATELLITE_CATALOG.iss.telemetry).toMatchObject({ provider: "Where the ISS at?", format: "JSON" });
+    expect(SATELLITE_CATALOG.roman.telemetry).toMatchObject({ provider: "NASA/JPL Horizons", format: "efemérides" });
 
-    const nonIss = Object.values(SATELLITE_CATALOG).filter(satellite => satellite.id !== "iss");
+    const nonIss = Object.values(SATELLITE_CATALOG).filter(satellite => satellite.id !== "iss" && satellite.id !== "roman");
     for (const satellite of nonIss) {
       expect(satellite.telemetry).toMatchObject({ provider: "CelesTrak GP/TLE", format: "TLE" });
       expect(satellite.telemetry.endpoint).toContain(`CATNR=${satellite.noradId}`);
@@ -61,6 +65,32 @@ describe("catálogo de satélites", () => {
     expect(new Set(snapshots.map(snapshot => snapshot.satellite.id)).size).toBe(10);
     expect(snapshots.every(snapshot => Number.isFinite(snapshot.latitude) && Number.isFinite(snapshot.longitude))).toBe(true);
     expect(snapshots.every(snapshot => snapshot.visibility === "estimativa orbital")).toBe(true);
+  });
+
+  it("consulta a posição geocêntrica real do Roman no JPL Horizons", async () => {
+    const horizonsResult = [
+      "header",
+      "$$SOE",
+      "2461283.500000000, A.D. 2026-Aug-31 00:00:00.0000, 98072.201, -96323.848, -28870.742, 1.8836, -1.1297, -0.4341,",
+      "$$EOE",
+    ].join("\\n");
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("ssd.jpl.nasa.gov")) return new Response(JSON.stringify({ result: horizonsResult }), { status: 200 });
+      throw new Error(`URL inesperada no teste: ${url}`);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const snapshot = await getOrbitSnapshot("roman");
+
+    expect(snapshot.satellite).toMatchObject({ id: "roman", noradId: null });
+    expect(snapshot.sourceUrl).toContain("ssd.jpl.nasa.gov");
+    expect(snapshot.groundLocation.label).toContain("direção geocêntrica");
+    expect(snapshot.visibility).toContain("L2");
+    expect(Number.isFinite(snapshot.latitude)).toBe(true);
+    expect(Number.isFinite(snapshot.longitude)).toBe(true);
+    expect(snapshot.altitude).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("gera uma trilha temporal de duas horas a partir do TLE de contingência", async () => {

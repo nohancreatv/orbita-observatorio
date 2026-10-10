@@ -1,12 +1,12 @@
 # Órbita — Observatório orbital em tempo real
 
-O **Órbita** é uma experiência editorial para acompanhar a Estação Espacial Internacional e outros objetos orbitais em um globo 3D. A aplicação combina telemetria orbital, geocodificação do ponto suborbital, previsão de passagem visível, condições locais de observação, agenda de lançamentos e uma curiosidade espacial diária.
+O **Órbita** permite acompanhar a Estação Espacial Internacional e outros objetos orbitais em um globo 3D. A aplicação reúne dados orbitais, previsão de passagens visíveis, condições locais de observação, agenda de lançamentos e uma curiosidade espacial diária.
 
-> A aplicação pública está em [satellite-now.netlify.app](https://satellite-now.netlify.app). Este repositório privado contém a aplicação e sua infraestrutura de publicação.
+> Acesse o observatório em [satellite-now.netlify.app](https://satellite-now.netlify.app).
 
 ## Recursos
 
-O observatório acompanha ISS, Hubble, Tiangong e NOAA 19 com propagação orbital no servidor. O globo usa React Three Fiber, mapas de dia e noite, nuvens, atmosfera e transições de foco em 500 ms. A página também contextualiza o ponto terrestre sob cada objeto, permite geolocalização opcional e apresenta previsão de passagem, condições de observação e agenda espacial.
+O observatório acompanha ISS, Hubble, Tiangong e NOAA 19 com propagação orbital no servidor. O globo usa React Three Fiber, mapas de dia e noite, nuvens e atmosfera. A página identifica o ponto terrestre sob cada objeto e permite geolocalização opcional para consultar passagens e condições de observação.
 
 As integrações externas incluem dados orbitais públicos, NASA APOD, geocodificação e clima. A curiosidade NASA possui cache, deduplicação e fallback não disruptivo para que um limite de fonte externa não interrompa a telemetria. A camada de segurança inclui cookies de sessão, CSP, HSTS, rate limiting, API sem cache e validação de entrada.
 
@@ -81,7 +81,7 @@ Para ativar o deploy automático, abra **Settings → Secrets and variables → 
 
 O token pode ser gerado no Netlify em **User settings → Applications → Personal access tokens**. O CLI usa `NETLIFY_AUTH_TOKEN` para autenticação e `NETLIFY_SITE_ID` para escolher o projeto publicado. [1]
 
-Depois de salvar os dois valores, faça um push na `main` ou abra **Actions → Validar e publicar no Netlify → Run workflow**. O workflow publica a mesma configuração de `netlify.toml`, incluindo a função Express/tRPC.
+Depois de salvar o segredo, faça um push na `main` ou abra **Actions → Validar e publicar no Netlify → Run workflow**. O workflow publica a mesma configuração de `netlify.toml`, incluindo a função Express/tRPC.
 
 ## Segurança e operação
 

@@ -32,9 +32,9 @@ const atmosphereFragmentShader = `
   varying vec3 vNormal;
   varying vec3 vViewDirection;
   void main() {
-    float fresnel = pow(1.0 - max(dot(normalize(vNormal), normalize(vViewDirection)), 0.0), 3.25);
+    float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewDirection))), 3.25);
     vec3 auroraBlue = vec3(0.17, 0.66, 0.95);
-    gl_FragColor = vec4(auroraBlue, fresnel * 0.28);
+    gl_FragColor = vec4(auroraBlue, fresnel * 0.22);
   }
 `;
 
@@ -76,6 +76,7 @@ function useReducedMotion() {
 
 // ─── Safe Texture Loader ───────────────────────────────────────────────
 function useSafeTexture(url: string) {
+  const { gl } = useThree();
   const [texture, setTexture] = useState<Texture | null>(null);
   const [error, setError] = useState(false);
 
@@ -92,7 +93,7 @@ function useSafeTexture(url: string) {
         }
         loadedTexture = loaded;
         loaded.colorSpace = SRGBColorSpace;
-        loaded.anisotropy = 2;
+        loaded.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
         setTexture(loaded);
       },
       undefined,
@@ -106,7 +107,7 @@ function useSafeTexture(url: string) {
       cancelled = true;
       loadedTexture?.dispose();
     };
-  }, [url]);
+  }, [url, gl]);
 
   return { texture, error };
 }
@@ -135,16 +136,17 @@ function EarthSurface() {
     return new MeshStandardMaterial({
       map: dayMap,
       emissiveMap: nightMap,
-      emissive: new Color("#193b58"),
-      emissiveIntensity: 0.36,
-      roughness: 0.76,
-      metalness: 0.04,
+      emissive: new Color("#c9ddff"),
+      emissiveIntensity: 0.45,
+      roughness: 0.95,
+      metalness: 0,
     });
   }, [dayMap, nightMap, dayError, nightError]);
+  useEffect(() => () => material.dispose(), [material]);
 
   return (
     <mesh material={material} rotation={[0, -Math.PI / 2, 0]}>
-      <sphereGeometry args={[1, 56, 56]} />
+      <sphereGeometry args={[1, 96, 64]} />
     </mesh>
   );
 }
@@ -154,8 +156,8 @@ function CloudLayer() {
   if (cloudError || !cloudMap) return null;
   return (
     <mesh rotation={[0, -Math.PI / 2, 0]}>
-      <sphereGeometry args={[1.012, 44, 44]} />
-      <meshPhongMaterial map={cloudMap} transparent opacity={0.28} depthWrite={false} blending={AdditiveBlending} />
+      <sphereGeometry args={[1.008, 80, 56]} />
+      <meshPhongMaterial map={cloudMap} transparent opacity={0.16} depthWrite={false} blending={AdditiveBlending} />
     </mesh>
   );
 }
@@ -169,13 +171,14 @@ function Atmosphere() {
     depthWrite: false,
     blending: AdditiveBlending,
   }), []);
-  return <mesh material={material}><sphereGeometry args={[1.045, 44, 44]} /></mesh>;
+  useEffect(() => () => material.dispose(), [material]);
+  return <mesh material={material}><sphereGeometry args={[1.025, 96, 64]} /></mesh>;
 }
 
 function GlobeOrbitRing() {
   return <mesh rotation={[MathUtils.degToRad(64), MathUtils.degToRad(-8), MathUtils.degToRad(18)]}>
-    <torusGeometry args={[1.095, 0.007, 8, 96]} />
-    <meshBasicMaterial color="#55cfff" transparent opacity={0.28} blending={AdditiveBlending} depthWrite={false} />
+    <torusGeometry args={[1.095, 0.003, 8, 160]} />
+    <meshBasicMaterial color="#55cfff" transparent opacity={0.16} blending={AdditiveBlending} depthWrite={false} />
   </mesh>;
 }
 
@@ -184,9 +187,10 @@ function MarkerGlow() {
   const material = useMemo(() => new ShaderMaterial({
     vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
     fragmentShader: "varying vec2 vUv; void main() { float dist = length(vUv - vec2(0.5)); float glow = smoothstep(0.5, 0.0, dist); glow = pow(glow, 2.0); vec3 color = mix(vec3(0.99, 0.61, 0.43), vec3(1.0, 0.82, 0.62), glow); gl_FragColor = vec4(color, glow * 0.55); }",
-    transparent: true, depthTest: false, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
+    transparent: true, depthTest: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
   }), []);
-  return <mesh material={material}><planeGeometry args={[0.28, 0.28]} /></mesh>;
+  useEffect(() => () => material.dispose(), [material]);
+  return <mesh material={material}><planeGeometry args={[0.16, 0.16]} /></mesh>;
 }
 
 // ─── Satellite Marker ──────────────────────────────────────────────────
@@ -214,6 +218,8 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion, 
       // exatamente na linha do horizonte da esfera.
       const frontVisible = worldMarkerPosition.current.dot(worldCameraPosition.current) > 0.03;
       markerVisual.current.visible = frontVisible;
+      // Face the camera so the focus rings remain circular while dragging.
+      markerVisual.current.lookAt(worldCameraPosition.current);
       const focusProgress = Math.min(1, Math.max(0, (performance.now() - transition.startedAt) / FOCUS_DURATION_MS));
       const smoothProgress = focusProgress * focusProgress * (3 - 2 * focusProgress);
       const handoffScale = isEntering ? 0.78 + smoothProgress * 0.22 : isLeaving ? 1.14 - smoothProgress * 0.14 : 1;
@@ -253,7 +259,7 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion, 
     if (active && glowRef.current) {
       const t = performance.now() / 1200;
       glowRef.current.scale.setScalar(0.85 + Math.sin(t * Math.PI * 2) * 0.15);
-      glowRef.current.lookAt(0, 0, 0);
+
     }
   });
 
@@ -273,13 +279,13 @@ function SatelliteMarker({ marker, active, transition, onSelect, reducedMotion, 
           <sphereGeometry args={[active ? 0.085 : 0.07, 16, 16]} />
           <meshBasicMaterial transparent opacity={0} depthTest={true} depthWrite={false} side={DoubleSide} />
         </mesh>
-        {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.065, 0.09, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
-        {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.07, 0.085, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
-        {active && <group ref={pulseWaveRef}><mesh><ringGeometry args={[0.058, 0.066, 32]} /><meshBasicMaterial color="#ffd0ba" transparent opacity={0.42} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
-        {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.068, 0.082, 32]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {isLeaving && <group ref={outgoingRing}><mesh><ringGeometry args={[0.04, 0.052, 48]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.7} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {isEntering && <group ref={incomingRing}><mesh><ringGeometry args={[0.042, 0.05, 48]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.85} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {active && <group ref={pulseWaveRef}><mesh><ringGeometry args={[0.036, 0.04, 48]} /><meshBasicMaterial color="#ffd0ba" transparent opacity={0.42} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
+        {active && <group ref={pulseRef}><mesh><ringGeometry args={[0.042, 0.048, 48]} /><meshBasicMaterial color="#ffb38d" transparent opacity={0.9} depthTest={true} depthWrite={false} side={DoubleSide} /></mesh></group>}
         {active && <group ref={glowRef}><MarkerGlow /></group>}
-        <mesh><sphereGeometry args={[active ? 0.042 : 0.03, 16, 16]} /><meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} depthTest={true} depthWrite={false} /></mesh>
-        {active && <mesh><sphereGeometry args={[0.018, 10, 10]} /><meshBasicMaterial color="#fff5ee" depthTest={true} depthWrite={false} /></mesh>}
+        <mesh><sphereGeometry args={[active ? 0.018 : 0.012, 20, 16]} /><meshBasicMaterial color={active ? "#ff9c6d" : "#63e6be"} depthTest={true} depthWrite={false} /></mesh>
+        {active && <mesh><sphereGeometry args={[0.007, 16, 12]} /><meshBasicMaterial color="#fff5ee" depthTest={true} depthWrite={false} /></mesh>}
       </group>
     </group>
   );
@@ -470,7 +476,7 @@ function OrbitControls({ groupRef, onInteract, focusActive = false, reducedMotio
       // Rotação autônoma linear, executada dentro do loop principal do R3F.
       // Não usar easing nem um tween pontual aqui: cada frame acrescenta o
       // mesmo valor ao eixo Y do grupo que contém o globo.
-      groupRef.current.rotation.y += AUTO_ROTATE_INCREMENT;
+      groupRef.current.rotation.y += AUTO_ROTATE_INCREMENT * frameScale;
     }
   });
 
@@ -596,9 +602,9 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
   }, []);
 
   return <>
-    <ambientLight intensity={0.34} color="#6cb7d8" />
-    <directionalLight position={[4, 2.5, 5]} intensity={1.6} color="#d7f5ff" />
-    <pointLight position={[-3, -1.5, -2]} intensity={0.24} color="#0a4d88" />
+    <ambientLight intensity={0.48} color="#dbe9f5" />
+    <directionalLight position={[4, 2.5, 5]} intensity={2} color="#fff5e7" />
+    <pointLight position={[-3, -1.5, -2]} intensity={0.3} color="#4c9bdb" />
 
     <group ref={outerGroup}>
         <OrbitControls groupRef={outerGroup} onInteract={handleInteract} focusActive={Boolean(markerTransition.fromId)} reducedMotion={reducedMotion} />
@@ -704,7 +710,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
       aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}
     >
       {webglAvailable === false ? <GlobeFallback onSwitchTo2D={onSwitchTo2D} /> : webglAvailable ? <Canvas
-        dpr={[1, 1.25]}
+        dpr={[1, 1.75]}
         frameloop="always"
         camera={{ position: [0, 0, 3.2], fov: 38 }}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}

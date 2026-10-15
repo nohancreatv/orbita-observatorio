@@ -710,11 +710,11 @@ export async function getIssClosestPass(latitude: number, longitude: number) {
     .reduce((closest, position) => (position.distance < closest.distance ? position : closest));
 }
 
-function safeNasaImage(url: string | undefined) {
+export function safeNasaImage(url: string | undefined) {
   if (!url) return null;
   try {
     const parsed = new URL(url);
-    return parsed.protocol === "https:" && (parsed.hostname.endsWith("nasa.gov") || parsed.hostname.endsWith("nasa.gov")) ? parsed.toString() : null;
+    return parsed.protocol === "https:" && (parsed.hostname === "nasa.gov" || parsed.hostname.endsWith(".nasa.gov")) ? parsed.toString() : null;
   } catch {
     return null;
   }

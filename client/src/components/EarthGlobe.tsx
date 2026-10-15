@@ -623,6 +623,17 @@ function GlobeFallback({ onSwitchTo2D }: { onSwitchTo2D?: () => void }) {
 
 // ─── Export ─────────────────────────────────────────────────────────────
 export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "", userLocation, onSwitchTo2D }: EarthGlobeProps) {
+  const [webglAvailable, setWebglAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    const canvas = document.createElement("canvas");
+    try {
+      const context = canvas.getContext("webgl2");
+      setWebglAvailable(Boolean(context));
+      context?.getExtension("WEBGL_lose_context")?.loseContext();
+    } catch {
+      setWebglAvailable(false);
+    }
+  }, []);
   const selectedMarker = markers.find(m => m.id === selectedId);
   const globeElementRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
@@ -692,7 +703,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
       data-reduced-motion={reducedMotion}
       aria-label={`Globo 3D com foco em ${selectedMarker?.name || "objeto orbital"}`}
     >
-      <Canvas
+      {webglAvailable === false ? <GlobeFallback onSwitchTo2D={onSwitchTo2D} /> : webglAvailable ? <Canvas
         dpr={[1, 1.25]}
         frameloop="always"
         camera={{ position: [0, 0, 3.2], fov: 38 }}
@@ -711,7 +722,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
             onMarkerVisibilityChange={handleMarkerVisibility}
           />
         </Suspense>
-      </Canvas>
+      </Canvas> : null}
     </div>
   );
 });

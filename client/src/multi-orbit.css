@@ -87,3 +87,5 @@
 .globe-unavailable { position: relative; z-index: 5; max-width: 300px; padding: 20px; background: rgba(7, 23, 35, .94); border: 1px solid #63e6be; color: #eaf2ee; text-align: center; pointer-events: auto; }
 .globe-unavailable p { margin-bottom: 16px; font-size: .85rem; line-height: 1.6; }
 .globe-unavailable .locate-button { justify-content: center; min-height: 44px; }
+
+.three-globe-fallback { display: flex; align-items: center; justify-content: center; height: 100%; transform: rotate(10deg); }

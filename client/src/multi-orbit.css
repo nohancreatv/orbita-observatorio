@@ -77,3 +77,9 @@
 @media (max-width: 760px) { .view-mode-switcher { margin-top: 18px; }.orbital-stage.orbital-stage--2d { height: auto; min-height: 0; margin: 10px -10px 0; padding: 15px 0 12px; }.orbit-comparison-2d { gap: 13px; padding: 0 11px; }.orbit-comparison-2d__header { display: block; }.orbit-comparison-2d__header h2 { max-width: 290px; font-size: 2.15rem; }.orbit-comparison-2d__header p:not(.orbit-comparison-2d__eyebrow) { font-size: .68rem; }.orbit-comparison-2d__readout { margin-top: 13px; }.orbit-comparison-2d__plot { min-height: 0; }.orbit-comparison-2d__legend { grid-template-columns: 1fr 1fr; }.orbit-comparison-chip { font-size: .52rem; }.orbit-comparison-chip small { display: none; } }
 @media (max-width: 420px) { .view-mode-switcher button { padding-inline: 9px; font-size: .51rem; }.orbit-comparison-2d__header h2 { font-size: 1.95rem; }.orbit-comparison-2d__legend { grid-template-columns: 1fr; }.orbit-comparison-legend-note { white-space: normal; } }
 @media (prefers-reduced-motion: reduce) { .orbit-comparison-2d__current-ring { animation: none; } }
+
+/* Keyboard access and comfortable touch targets. */
+.skip-link { position: fixed; top: 12px; left: 12px; z-index: 1000; padding: 12px 18px; background: #63e6be; color: #071723; transform: translateY(-160%); }
+.skip-link:focus { transform: translateY(0); }
+.observatory-shell :is(a, button):focus-visible { outline: 2px solid #ffb38d; outline-offset: 4px; }
+@media (pointer: coarse) { .satellite-option, .view-mode-switcher button, .orbit-comparison-chip, .refresh-button { min-height: 44px; min-width: 44px; } }

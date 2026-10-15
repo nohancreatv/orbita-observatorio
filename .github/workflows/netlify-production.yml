@@ -1,4 +1,4 @@
-name: Validar e publicar no Netlify
+name: Validar aplicação para Netlify
 
 on:
   push:
@@ -48,30 +48,6 @@ jobs:
       - name: Validar build e função Netlify
         run: pnpm exec netlify build --offline
 
-  deploy:
-    name: Publicar produção
-    needs: validate
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Obter código
-        uses: actions/checkout@v4
 
-      - name: Configurar pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Instalar dependências
-        run: pnpm install --frozen-lockfile
-
-      - name: Publicar no Netlify
-        run: pnpm exec netlify deploy --prod --build --message "GitHub Actions • $GITHUB_SHA"
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ed790cb7-fd05-4528-9ea7-54631f824a72
-          VITE_ADSENSE_PUBLISHER_ID: ca-pub-5884730150482896
+# A publicação é feita pela integração automática do projeto no Netlify.
+# Este workflow verifica tipos, testes e o empacotamento da função.

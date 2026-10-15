@@ -277,6 +277,7 @@ export default function Home() {
             <img src="/assets/iss-hero-earth_dc590d13.jpg" alt="Terra vista do espaço" className="hero-earth-art" />
             <div className="orbit-caption orbit-caption-top"><span /> globo orbital em rotação</div>
             <EarthGlobe
+              onSwitchTo2D={() => setViewMode("2d")}
               markers={globeMarkers}
               selectedId={selectedSatellite}
               onSelect={id => selectSatellite(id as SatelliteId)}

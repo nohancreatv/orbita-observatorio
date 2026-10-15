@@ -83,3 +83,7 @@
 .skip-link:focus { transform: translateY(0); }
 .observatory-shell :is(a, button):focus-visible { outline: 2px solid #ffb38d; outline-offset: 4px; }
 @media (pointer: coarse) { .satellite-option, .view-mode-switcher button, .orbit-comparison-chip, .refresh-button { min-height: 44px; min-width: 44px; } }
+
+.globe-unavailable { position: relative; z-index: 5; max-width: 300px; padding: 20px; background: rgba(7, 23, 35, .94); border: 1px solid #63e6be; color: #eaf2ee; text-align: center; pointer-events: auto; }
+.globe-unavailable p { margin-bottom: 16px; font-size: .85rem; line-height: 1.6; }
+.globe-unavailable .locate-button { justify-content: center; min-height: 44px; }

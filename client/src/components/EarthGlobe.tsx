@@ -47,6 +47,7 @@ export type EarthGlobeProps = {
   selectedId: string;
   onSelect: (id: string) => void;
   className?: string;
+  onSwitchTo2D?: () => void;
   userLocation?: { latitude: number; longitude: number } | null;
 };
 
@@ -616,12 +617,12 @@ function GlobeScene({ markers, selectedId, markerTransition, onSelect, userLocat
 }
 
 // ─── Fallback ──────────────────────────────────────────────────────────
-function GlobeFallback() {
-  return <div className="three-globe-fallback" aria-hidden="true"><span /></div>;
+function GlobeFallback({ onSwitchTo2D }: { onSwitchTo2D?: () => void }) {
+  return <div className="three-globe-fallback" role="status"><div className="globe-unavailable"><p>O globo 3D precisa de WebGL, indisponível neste navegador.</p>{onSwitchTo2D && <button type="button" className="locate-button" onClick={onSwitchTo2D}>explorar órbitas em 2D</button>}</div></div>;
 }
 
 // ─── Export ─────────────────────────────────────────────────────────────
-export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "", userLocation }: EarthGlobeProps) {
+export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSelect, className = "", userLocation, onSwitchTo2D }: EarthGlobeProps) {
   const selectedMarker = markers.find(m => m.id === selectedId);
   const globeElementRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
@@ -696,7 +697,7 @@ export const EarthGlobe = memo(function EarthGlobe({ markers, selectedId, onSele
         frameloop="always"
         camera={{ position: [0, 0, 3.2], fov: 38 }}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-        fallback={<GlobeFallback />}
+        fallback={<GlobeFallback onSwitchTo2D={onSwitchTo2D} />}
       >
         <Suspense fallback={null}>
           <GlobeScene

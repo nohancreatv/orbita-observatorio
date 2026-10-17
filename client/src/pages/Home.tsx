@@ -8,6 +8,7 @@ import {
   CloudSun,
   Eye,
   Gauge,
+  Github,
   LocateFixed,
   MapPin,
   Orbit,
@@ -28,6 +29,7 @@ import { RevealText } from "@/components/RevealText";
 import { useConsent } from "@/contexts/ConsentContext";
 import { trpc } from "@/lib/trpc";
 import "../multi-orbit.css";
+import "../design-polish.css";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type SatelliteId = RouterOutputs["orbit"]["catalog"][number]["id"];
@@ -337,6 +339,11 @@ export default function Home() {
             <a href="#inicio" className="footer-logo" aria-label="Órbita, início"><img src="/assets/orbita-logo_99dcd0cb.svg" alt="" /><span>órbita</span></a>
             <span className="footer-kicker">instrumento público · atualização contínua</span>
             <p className="footer-tagline">Um pequeno observatório para grandes distâncias. Dados orbitais públicos transformados em experiência visual e educativa.</p>
+            <a className="footer-creator" href="https://github.com/nohancreatv" target="_blank" rel="noopener noreferrer" aria-label="Visitar o GitHub de Nohan Caserta (abre em nova aba)">
+              <span className="footer-creator__icon"><Github size={22} aria-hidden="true" /></span>
+              <span className="footer-creator__copy"><small>Desenvolvido por</small><strong>Nohan Caserta</strong><span>@nohancreatv · visitar GitHub</span></span>
+              <ArrowUpRight size={18} aria-hidden="true" />
+            </a>
             <div className="footer-brand__meta"><span><Radio size={13} aria-hidden="true" /> {allSnapshots.length || "—"} objetos ativos</span><span><Clock3 size={13} aria-hidden="true" /> {currentTime} local</span></div>
             <div className="footer-links"><button type="button" onClick={clearPreferences}>preferências de publicidade</button><a href="/fontes">como usamos os dados <ArrowUpRight size={13} aria-hidden="true" /></a></div>
           </div>

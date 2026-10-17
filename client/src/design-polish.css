@@ -1,0 +1,55 @@
+/* Small visual refinements, scoped to the observatory. */
+.observatory-shell { --panel-border: rgba(173, 210, 221, .18); }
+.observatory-shell section[id] { scroll-margin-top: 28px; }
+.observatory-shell .hero-description { color: #b9cbd4; }
+.observatory-shell .satellite-selector { border-top-color: var(--panel-border); }
+.observatory-shell .selector-options { gap: 8px; }
+.observatory-shell .satellite-option { min-height: 34px; padding: 8px 12px; transition: background .18s ease, border-color .18s ease, color .18s ease; }
+.observatory-shell .satellite-option:hover { border-color: #63e6be; background: rgba(99, 230, 190, .1); }
+.observatory-shell .locate-button { border-radius: 8px; box-shadow: 0 4px 20px rgba(40, 174, 145, .12); }
+.observatory-shell .live-readout { line-height: 1.6; align-items: flex-start; }
+.observatory-shell .live-readout svg { flex-shrink: 0; margin-top: 2px; }
+.observatory-shell .telemetry-strip { border: 1px solid var(--panel-border); border-radius: 12px; background: linear-gradient(110deg, rgba(19, 47, 63, .55), rgba(8, 24, 39, .42)); }
+.observatory-shell .telemetry-item { min-width: 0; }
+.observatory-shell .telemetry-item strong { line-height: 1.45; overflow-wrap: anywhere; }
+.observatory-shell .globe-badge { border-radius: 10px; border-color: var(--panel-border); box-shadow: 0 12px 32px rgba(0, 0, 0, .15); }
+.observatory-shell .object-focus-image,
+.observatory-shell .object-ground-portrait,
+.observatory-shell .sky-condition-panel,
+.observatory-shell .space-story-section { border-radius: 12px; overflow: hidden; }
+.observatory-shell .space-story-section { border: 1px solid var(--panel-border); }
+.observatory-shell .story-copy { min-width: 0; }
+.observatory-shell .story-copy > p { line-height: 1.85; }
+.observatory-shell .launch-entry { gap: 20px; }
+.observatory-shell .launch-entry:hover { background: rgba(99, 230, 190, .045); }
+.observatory-shell .footer-console { border-radius: 10px; }
+.observatory-shell .footer-nav-group nav { gap: 5px; }
+.observatory-shell .footer-nav-group :is(a, button) { padding-block: 6px; line-height: 1.5; }
+.observatory-shell .footer-bottom { color: #95aab6; }
+
+/* Author link: a visible invitation to explore the creator's work. */
+.footer-creator { display: flex; align-items: center; gap: 14px; width: 100%; max-width: 370px; padding: 16px; margin: 5px 0; border: 1px solid rgba(99, 230, 190, .25); border-radius: 12px; background: linear-gradient(115deg, rgba(99, 230, 190, .07), rgba(14, 34, 49, .5)); color: #eaf3ef; text-decoration: none; text-transform: none; letter-spacing: 0; transition: border-color .18s ease, background .18s ease; }
+.footer-creator:hover { border-color: #63e6be; background: rgba(99, 230, 190, .1); }
+.footer-creator__icon { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 50%; color: #63e6be; background: rgba(99, 230, 190, .1); }
+.footer-creator__copy { display: flex; flex-direction: column; min-width: 0; gap: 5px; }
+.footer-creator__copy small { color: #9bb3bd; font: .62rem/1.4 "IBM Plex Mono", monospace; }
+.footer-creator__copy strong { color: #f4f3ec; font: 600 .95rem/1.35 "Manrope", sans-serif; }
+.footer-creator__copy > span { color: #80dcc1; font: .65rem/1.5 "Manrope", sans-serif; }
+.footer-creator > svg { flex-shrink: 0; margin-left: auto; color: #80dcc1; }
+
+@media (min-width: 761px) {
+  .observatory-shell :is(.sky-conditions-section, .launches-section) { margin-top: 100px; }
+}
+@media (max-width: 760px) {
+  .observatory-shell .satellite-option { min-height: 40px; }
+  .observatory-shell .launch-entry { gap: 12px; }
+  .observatory-shell .footer-nav { row-gap: 26px; }
+  .footer-creator { max-width: none; }
+}
+@media (pointer: coarse) {
+  .observatory-shell .satellite-option { min-height: 44px; }
+  .observatory-shell .footer-nav-group :is(a, button) { min-height: 44px; display: inline-flex; align-items: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .footer-creator, .observatory-shell .satellite-option { transition: none; }
+}
